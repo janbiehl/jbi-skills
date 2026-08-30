@@ -1,10 +1,11 @@
 ---
 name: to-tickets
-description: Breaks a plan, spec, or the current conversation into a graph of thin vertical-slice tickets with explicit blocking edges, published as GitHub issues under an epic or as local markdown files. Use when the user wants to turn a plan into tickets, break a feature into work items, slice a spec into issues, or decompose a design before implementation.
-argument-hint: "[spec path | issue URL]"
+description: Breaks a plan, spec, or the current conversation into a graph of thin vertical-slice tickets with explicit blocking edges, published as GitHub issues under an epic, written as local markdown files, or kept in the conversation. Use when the user wants to turn a plan into tickets, break a feature into work items, slice a spec into issues, or decompose a design before implementation.
+argument-hint: "[--context | --files] [spec path | issue URL]"
 disable-model-invocation: true
-# Read-only detection only. Issue creation and graph mutations stay behind a prompt.
-allowed-tools: Bash(gh repo view:*) Bash(gh issue view:*) Bash(git rev-parse:*) Read Grep Glob
+# Read-only detection only. Issue creation, graph mutations, and file writes all
+# stay behind a prompt.
+allowed-tools: Bash(gh repo view:*) Bash(gh issue view:*) Bash(git rev-parse:*) Bash(git check-ignore:*) Read Grep Glob
 ---
 
 # To Tickets
@@ -15,9 +16,28 @@ through every layer end to end and declares which other tickets block it.
 The skill publishes once and stops. It does not track status, re-label, or reconcile
 the graph afterwards — the tracker owns what happens next.
 
-## Pick the tracker
+## Pick the destination
 
-Default to GitHub issues. One command decides it:
+Two flags decide where the tickets end up. Strip them out of `$ARGUMENTS` before
+reading the rest as a spec path or issue reference.
+
+| Flag | Destination | Publish step |
+| :--- | :--- | :--- |
+| `--context` | This reply. No issue, no file, not even a temp file. | 6c |
+| `--files` | Local markdown under `.scratch/<plan-slug>/`. Never GitHub. | 6b |
+| neither | GitHub issues, falling back to local files when GitHub is not an option. | 6a, else 6b |
+
+**A destination only ever narrows.** The default path may fall back to local files;
+nothing ever moves the other way. `--files` does not reach for GitHub because a
+remote turned out to be there, and `--context` does not write a file because the
+breakdown got long or the user would probably want one. Someone who reaches for a
+flag has already decided the blast radius, and the two are different sizes: issues
+land in a shared tracker where a team sees them and deleting them is awkward, while
+files under `.scratch/` are private until an unrelated `git add .` sweeps them into a
+commit. Given both flags, `--context` wins as the narrower of the two — say so
+rather than picking silently.
+
+With neither flag, one command decides between GitHub and local:
 
 ```sh
 gh repo view --json nameWithOwner -q .nameWithOwner
@@ -28,8 +48,8 @@ authenticated — all three cases where GitHub is not an option. On failure, fal
 to local files and say which of the three it was, so the user can fix it and re-run
 if the fallback was not what they wanted.
 
-State the resolved target in the review step (step 4) so the user can switch to local
-in the same round they approve the breakdown.
+State the resolved destination in the review step (step 4) so the user can switch in
+the same round they approve the breakdown.
 
 ## Process
 
@@ -117,7 +137,7 @@ a form a reader can see at a glance. A single ticket needs no epic.
 
 ### 4. Review with the user
 
-Show the target tracker, then the breakdown in two views.
+Show the resolved destination, then the breakdown in two views.
 
 **Per-ticket list**, numbered by id:
 
@@ -142,8 +162,11 @@ Layer 1:            [T3: Login flow]        [T4: Profile read API]
 Layer 2:                     [T5: End-to-end demo]
 ```
 
-On the local path, also propose the plan slug (`Plan slug: auth-rebuild — change?`),
-derived from the source title, so it is settled in the same round.
+When the destination is local files, settle two more things in this same round.
+Propose the plan slug (`Plan slug: auth-rebuild — change?`), derived from the source
+title. And run `git check-ignore -q .scratch`; when it fails, say in one line that the
+ticket files will show up in `git status`. Do not edit `.gitignore` — that is the
+user's call, and someone who wants nothing on disk at all has `--context`.
 
 Then ask: is the granularity right, are the blocking edges real, should anything be
 merged or split? Iterate. Treat a clear approval as terminal — do not add a
@@ -163,6 +186,8 @@ Re-run after fixing. Escalate only when no obvious fix exists. Publishing a cycl
 produces a set of tickets none of which can ever start.
 
 ### 6a. Publish to GitHub
+
+Only on the default path, and only once `gh repo view` has succeeded.
 
 Write each body to a temp file and pass `--body-file`; issue bodies contain backticks,
 newlines, and checklists that do not survive shell quoting intact.
@@ -260,6 +285,24 @@ issue if the plan came from one.
 
 One ticket per file, never a combined file. `README.md` is the epic and is written
 last, once the ids are final.
+
+Report the directory and the ticket files by layer. Nothing is staged or committed;
+the files are the user's to keep, ignore, or delete.
+
+### 6c. Keep it in the conversation
+
+`--context` publishes nothing. Render the epic and every ticket in full, in the reply,
+against the same templates — the structure is the deliverable whether or not it lands
+somewhere addressable. Use the local ticket template, so ids carry the graph; there are
+no issue numbers to cite. Skip the plan slug and the `.scratch` check, which only
+matter to a path that touches disk.
+
+This does not repeat step 4. Step 4 showed titles, blocking edges, and the graph; what
+lands here is everything it left out — Context, What to build, and Acceptance criteria,
+for every ticket.
+
+Then stop. Do not write the files anyway, and do not ask whether to; someone who wants
+them re-runs with `--files`, and naming that once is the whole of the offer.
 
 ## Templates
 
