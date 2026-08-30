@@ -423,13 +423,17 @@ The rules below are mainly about these.
 
 ### Rules for orchestrators
 
-1. **State lives on disk, not in context.** Plans, slices, and progress go to
-   files under a predictable path. Context is lost to compaction; files are not.
-   An orchestrator must be able to resume from disk alone after a fresh start.
+1. **State lives outside context, not in it.** Plans, work items, and progress
+   go somewhere durable — files under a predictable path, or the tracker the work
+   already lives on. Context is lost to compaction; neither of those is. An
+   orchestrator must be able to resume from that store alone after a fresh start.
+   Keep it to one store: status held in two places drifts.
 
-2. **One agent, one job.** The agent that implements is not the agent that
-   verifies. A verifier that also wrote the code will pass its own work. Keep the
-   verifier read-only in its tool grant.
+2. **Nothing passes on its author's word.** The agent that implements is not the
+   agent that verifies, and a verifier that also wrote the code will pass its own
+   work. Keep the verifier read-only in its tool grant. A worker that fixes what
+   it reviewed is fine — as long as the independent verifier runs after it, on
+   the result.
 
 3. **Subagent contracts are explicit.** Every spawned agent gets: the exact path
    of the file describing its task, the tools it may use, and the *structured
@@ -447,11 +451,14 @@ The rules below are mainly about these.
 
 6. **The orchestrator owns git.** Workers never commit, push, or touch branch
    state. Concentrating side effects in one place is what makes a failed slice
-   recoverable.
+   recoverable. Stage by explicit path, and where more than one worker writes in
+   a slice, stage the union of what they report — a path nobody stages stays
+   dirty and lands in the next slice's commit.
 
 7. **Gate on verification, not on optimism.** Advance to the next slice only on
-   an explicit PASS. On FAIL, the orchestrator decides — retry, narrow, or stop
-   and report — and never silently continues.
+   an explicit PASS, and run verification last, so it judges the tree that will
+   actually be committed. On FAIL, the orchestrator decides — retry, narrow, or
+   stop and report — and never silently continues.
 
 8. **Isolation when workers write in parallel.** Parallel agents mutating the
    same tree corrupt each other; give them worktrees or run them sequentially.
@@ -464,6 +471,12 @@ The rules below are mainly about these.
    do everything that does not depend on an answer first. An autonomous loop that
    must not block sets `disallowed-tools: AskUserQuestion` and states its
    assumptions in the report instead.
+
+11. **Invoke expensive skills from a worker, not from the orchestrator.** A
+   nested skill renders into the caller's context and stays there (§9). The
+   orchestrator's context is the one that has to survive the whole run, so a
+   per-slice invocation belongs in a subagent that returns a short report.
+   Invoke inline only at the end, where nothing comes after it.
 
 ### Forked skills
 
