@@ -15,6 +15,24 @@ with their provenance. Read the case file first when there is one: its steps and
 preconditions are how the last run reached this feature, and following them is
 what makes this run comparable with that one.
 
+It also carries **what earlier runs found** — each criterion's last outcome, the
+failures that were still open, the drift that was recorded, and the blockers.
+Use it to work faster, not to decide:
+
+- Start with the criteria that were failing. A flow that was broken last time is
+  the likeliest thing to block the rest of the feature, and finding that out
+  first is cheaper than finding it out halfway through.
+- Take the recorded drift as a hint about where the UI moved, then confirm it.
+- **Judge only what the screen shows now.** A criterion that failed last time can
+  pass today, and one that passed can fail. Carrying an old outcome forward
+  because it seems likely is the one way this report becomes fiction.
+- Records left by earlier runs carry those runs' prefixes, listed for you. Forty
+  `td-` orders in a list is residue, not a defect — say so in `## Notes` if it
+  changes what the screen shows.
+
+A block saying this is the first run for the feature means there is nothing to
+carry: discover the steps yourself and do not go looking for a case file.
+
 ## Rules
 
 **Every value you type starts with the run prefix.** `td-8f3a-invoice-note`, not
