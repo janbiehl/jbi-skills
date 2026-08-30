@@ -138,7 +138,8 @@ spawn a worker, until the user replies.
 
 Branch `orchestrate/1582-<slug>`, one commit per passed ticket, pushed as it goes;
 a draft PR opens once the first ticket lands. Progress is written back to a single
-comment on #1582. Verified with `<the project's own commands>`. CI is checked once,
+comment on #1582. Each ticket is reviewed with `/code-review low --fix` over its
+own diff and then verified with `<the project's own commands>`. CI is checked once,
 after the last ticket, and a run that finishes every ticket ends with
 `/code-review medium --comment`, which posts a first pass of review comments on
 the PR.
@@ -236,26 +237,40 @@ For each ticket in order:
    general-purpose`, `model: sonnet`, prompt = the contents of
    `${CLAUDE_SKILL_DIR}/agents/implementer.md` followed by the ticket's issue
    number, `owner/repo`, the epic's number, the verify commands, and the repo root.
-3. **Verify.** Spawn a second agent the same way with
-   `${CLAUDE_SKILL_DIR}/agents/verifier.md`, plus the ticket's issue number,
+3. **Review.** Spawn a second agent the same way with
+   `${CLAUDE_SKILL_DIR}/agents/reviewer.md`, plus the ticket's issue number,
    `owner/repo`, the verify commands, and the implementer's `## Files changed`
-   list verbatim. Never reuse the implementer for this — an agent that wrote the
-   code will pass its own work.
-4. **Act on the verdict.**
+   list verbatim. It runs `/code-review low --fix` over the uncommitted diff — at
+   this point exactly this ticket's changes — and applies what is worth applying.
+   Never target the branch here: that re-reviews every ticket already committed,
+   and the findings it repeats are ones the user has already been shown.
+   Keep the review out of your own context. This session holds the plan, the
+   ledger, and git, and a review pass inlined here for every ticket is a chance
+   per ticket to compact away the only copy of the run.
+4. **Verify.** Spawn a third agent the same way with
+   `${CLAUDE_SKILL_DIR}/agents/verifier.md`, plus the ticket's issue number,
+   `owner/repo`, the verify commands, and the implementer's and reviewer's
+   `## Files changed` lists together. Verification runs last so that it judges the
+   tree that will actually be committed, review fixes included. Never reuse the
+   implementer or the reviewer for this — an agent that wrote the code will pass
+   its own work. The verifier may list a review fix under `## Out of scope`; that
+   is expected and does not fail the ticket.
+5. **Act on the verdict.**
 
 **PASS** — confirm the workers left git alone (`git log -1 --format=%H` still
 points at the previous ticket's commit), then stage exactly the paths the
-implementer named, commit, push:
+implementer and the reviewer named, commit, push:
 
 ```sh
-git add <paths from the implementer's report>
+git add <paths from the implementer's and the reviewer's reports>
 git commit -m "feat(scope): subject" -m "Refs #1583"
 git push -u origin orchestrate/<epic number>-<slug>
 ```
 
-Never `git add -A`: a worker may have left scratch files, and only the paths it
-reported belong to this ticket. Conventional Commits, imperative, lowercase, no
-trailing period, subject derived from the ticket title; the `Refs` line is what
+Never `git add -A`: a worker may have left scratch files, and only the paths they
+reported belong to this ticket. A reviewer path left unstaged stays dirty in the
+tree and lands in the next ticket's commit. Conventional Commits, imperative,
+lowercase, no trailing period, subject from the ticket title; the `Refs` line is what
 lets a bare commit be traced back to its issue. Record the short SHA in the ledger
 and set the status to `passed`.
 
@@ -272,12 +287,13 @@ carries no `Closes` lines yet: step 6 rewrites it once the run's outcome is know
 **FAIL, caused by this ticket** — discard the attempt and retry once:
 
 ```sh
-git restore --source=HEAD --staged --worktree -- <paths from the report>
-git clean -fd -- <paths the report lists as new>
+git restore --source=HEAD --staged --worktree -- <paths from both reports>
+git clean -fd -- <paths either report lists as new>
 ```
 
 Spawn a fresh implementer with the same ticket plus the verifier's `## Reason` and
-failing criteria. Verify again. A second FAIL stops the run.
+failing criteria, then review and verify again as before. A second FAIL stops the
+run.
 
 **FAIL, blamed on an earlier ticket** — the verifier's `## Blame` says the cause is
 already committed. Fix forward once: spawn an implementer scoped to that regression
@@ -313,8 +329,11 @@ gh pr checks --watch
 ```
 
 On a run where every ticket passed and a PR exists, get a first review of what the
-branch now contains. Invoke it with the Skill tool — `skill: code-review`, `args:
-medium --comment <pr number>`, which is the command form:
+branch now contains. Each ticket's own review saw one diff in isolation; this is the
+only pass that sees the tickets together, which is where a duplicated helper or a
+pattern that drifted between tickets shows up. Invoke it with the Skill tool —
+`skill: code-review`, `args: medium --comment <pr number>`, which is the command
+form:
 
 ```text
 /code-review medium --comment <pr number>
@@ -362,8 +381,8 @@ coverage of work that was never attempted.
 
 ## Subagent contracts
 
-Both workers are pinned to `model: sonnet`. The reason is division of labour, not
-cost: this session holds the plan, the ledger, and git, and a run where the
+All three workers are pinned to `model: sonnet`. The reason is division of labour,
+not cost: this session holds the plan, the ledger, and git, and a run where the
 orchestrator starts implementing loses the one clean rollback point it has. Keep
 yourself on the session's model — do not set `model` in this skill's frontmatter.
 
@@ -388,6 +407,7 @@ once, exactly like a FAIL.
 | Agent | Returns |
 | :--- | :--- |
 | implementer | `## Summary`, `## Files changed`, `## Commands run`, `## Not done` |
+| reviewer | `## Findings`, `## Files changed`, `## Commands run`, `## Left alone` |
 | verifier | `## Verdict` (`PASS`/`FAIL`), `## Criteria`, `## Evidence`, `## Blame`, `## Needs human`, `## Reason`, `## Out of scope` |
 
 A `PASS` whose `## Evidence` contains no command output is not a PASS. Treat it as
