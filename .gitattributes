@@ -1,0 +1,4 @@
+# Keep shell scripts LF on every platform — CRLF breaks them under
+# WSL and Git Bash. PowerShell keeps the Windows convention.
+* text=auto eol=lf
+*.ps1 text eol=crlf
