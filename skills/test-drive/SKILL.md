@@ -1,27 +1,43 @@
 ---
 name: test-drive
-description: Drives the running application through everything that landed in a time window — reads git for the commits, groups them into features by pull request or epic, and judges each against its acceptance criteria the way a user would, persisting cases and verdicts under .scratch/agent-tests. Use when the user asks what landed last week, wants the new features clicked through, a release QA'd or smoke-tested by hand, or says "test-drive", "durchklicken", or "was ist letzte Woche gelandet".
-argument-hint: "[time window | git range]"
+description: Drives the running application through everything that landed in a time window, or — with --feature — through one named feature, judging each against its acceptance criteria the way a user would and persisting cases and verdicts under .scratch/agent-tests. Use when the user asks what landed last week, wants the new features clicked through, a release QA'd or smoke-tested by hand, wants to see how one feature actually behaves in the UI, or says "test-drive", "durchklicken", or "was ist letzte Woche gelandet".
+argument-hint: "[time window | git range | --feature <name | #issue | slug>]"
 disable-model-invocation: true
 # The gate is plain text before any interaction; nothing may block mid-sweep.
 disallowed-tools: AskUserQuestion
 # Browser automation is not granted here: the MCP server's name is per-machine,
 # so it is discovered at run time and prompts on first use.
-allowed-tools: Read Write Grep Glob Agent Bash(git log:*) Bash(git show:*) Bash(git status:*) Bash(git branch:*) Bash(git rev-parse:*) Bash(git rev-list:*) Bash(git tag:*) Bash(git describe:*) Bash(git check-ignore:*) Bash(gh repo view:*) Bash(gh pr list:*) Bash(gh pr view:*) Bash(gh issue view:*) Bash(gh api:*) Bash(ls:*)
+allowed-tools: Read Write Grep Glob Agent Bash(git log:*) Bash(git show:*) Bash(git status:*) Bash(git branch:*) Bash(git rev-parse:*) Bash(git rev-list:*) Bash(git tag:*) Bash(git describe:*) Bash(git check-ignore:*) Bash(gh repo view:*) Bash(gh pr list:*) Bash(gh pr view:*) Bash(gh issue list:*) Bash(gh issue view:*) Bash(gh api:*) Bash(ls:*)
 ---
 
 # Test-drive what landed
 
-Takes a time window, works out which user-visible features landed in it, and
-drives the running application through each one the way a person would — judging
-every acceptance criterion against what the screen actually shows. Output is a
-run directory under `.scratch/agent-tests` plus a summary in chat. This skill
-never edits source, never commits, and never writes anywhere else.
+Works out which user-visible features to test — everything that landed in a time
+window, or the one feature you named — and drives the running application through
+each the way a person would, judging every acceptance criterion against what the
+screen actually shows. Output is a run directory under `.scratch/agent-tests`
+plus a summary in chat. This skill never edits source, never commits, and never
+writes anywhere else.
+
+## Two modes
+
+| Invocation | What gets tested |
+| :--- | :--- |
+| `/test-drive [window]` | every feature that landed in a time window or git range |
+| `/test-drive --feature <name \| #issue \| slug>` | one feature, whenever it landed |
+
+Steps 4 to 7 are identical in both: same gate, same run directory, same tester,
+same report. The modes differ only in how the feature list and its criteria are
+arrived at — read out of the log, or resolved from the name you were given.
+
+Strip `--feature` and its value out of `$ARGUMENTS` before reading the rest; what
+is left is a base URL when it looks like one. Feature mode resolves no window, so
+no verdict in that run depends on the log.
 
 ## The four rules that make a verdict mean something
 
 1. **Criteria are found, not invented.** A criterion written by a human in a
-   ticket or a pull request outranks one this skill derives from the diff, and
+   ticket or a pull request outranks one this skill derives from the code, and
    every criterion carries which it is. A derived criterion describes what the
    code *does*; only a written one says what it *should* do, so a report that
    mixes them without saying which is which overstates itself.
@@ -51,19 +67,22 @@ never edits source, never commits, and never writes anywhere else.
 
 Copy this checklist into your reply and tick items off:
 
-- [ ] 1. Resolve the window
-- [ ] 2. Group what landed into features
+- [ ] 1. Resolve the target — a window, or the feature
+- [ ] 2. Group what landed into features — window mode only
 - [ ] 3. Collect the criteria and what earlier runs already know
 - [ ] 4. Gate: target, environment, plan — wait for approval
 - [ ] 5. Open the run directory
 - [ ] 6. Drive the features, one tester each
 - [ ] 7. Report
 
-### 1. Resolve the window
+### 1. Resolve the target
 
-`$ARGUMENTS` is a git range when it contains `..`, otherwise a date expression
-passed to `--since` (`last week`, `since friday`, `3 days`). Empty arguments
-resolve in this order, and the report says which one was used:
+`--feature` anywhere in `$ARGUMENTS` selects feature mode; anything else is
+window mode.
+
+**Window mode.** `$ARGUMENTS` is a git range when it contains `..`, otherwise a
+date expression passed to `--since` (`last week`, `since friday`, `3 days`).
+Empty arguments resolve in this order, and the report says which one was used:
 
 1. **The last recorded run.** Read the newest directory under
    `.scratch/agent-tests/runs/` and take the end SHA from its `**Window:**` line.
@@ -86,7 +105,25 @@ An empty window is a complete answer: say nothing landed in it and stop, before
 the gate. Not a git repository is fatal for the same reason — the window is
 defined in git and there is no sweep without it.
 
+**Feature mode.** The value after `--feature` is an issue reference (`#1583`, a
+URL), the slug of a case file under `.scratch/agent-tests/cases/`, or free text
+naming a capability. Resolve it to exactly one feature — the ticket that
+specifies it, or the code that implements it — and carry the evidence for the
+match into the gate. A wrong match costs the whole run and leaves records in the
+application; the gate is the one place the user can catch it.
+
+How to search, what to do with more than one plausible match, and how to derive
+criteria from code rather than from a diff:
+[references/feature-mode.md](references/feature-mode.md) — read it during this
+step.
+
+Feature mode records no start and end SHA, so a directory that is not a git
+repository costs it the app revision comparison, not the run.
+
 ### 2. Group what landed into features
+
+Window mode only — feature mode named its single feature in step 1 and goes
+straight to step 3.
 
 A feature is one user-visible capability: an epic, or the pull request that
 delivered it. Join each commit to one, in this precedence order — the first that
@@ -126,7 +163,13 @@ For each feature, in this order:
 
 An epic's criteria whose ticket did not land inside the window are `out of
 window`: listed, not tested, not counted against the verdict. Half an epic
-reported as a whole one is the failure mode this prevents.
+reported as a whole one is the failure mode this prevents. In feature mode the
+same outcome covers a criterion whose ticket is still open — there is no window,
+but there is unbuilt work, and it gets the same treatment.
+
+Feature mode skips step 2 and still needs two things out of its reference:
+pulling a ticket's `## Acceptance criteria` and resolving that ticket up to its
+epic. Read [references/grouping.md](references/grouping.md) for both.
 
 Then look for `.scratch/agent-tests/cases/<slug>.md`. When one exists, reuse its
 steps and preconditions — that is what makes this run comparable with the last —
@@ -183,6 +226,20 @@ explicit yes — not a page load, not a login.
 Confirm this target is **not production**, and I will start.
 ```
 
+In feature mode the first three lines are these instead:
+
+```markdown
+**Feature:** <name> — resolved from <issue #1583 | case file <slug> | code search "<terms>">
+**Matched on:** <the evidence: the issue title, the files, the case file's steps>
+**Criteria:** <n> from tickets, <n> from pull requests, <n> derived, <n> not landed yet
+```
+
+The rest of the block is unchanged, with two readings adjusted: **App revision**
+reports what the app exposes with no window to compare it against, and the
+feature list at the bottom becomes the near misses — whatever else the search
+turned up, one line each, with what each matched on. A near miss named here costs
+three lines; the wrong feature tested costs the run.
+
 Fill the target and the driver before printing, in this order:
 
 - **Base URL.** Take it from the user's argument if given; otherwise from
@@ -224,7 +281,8 @@ it stopped.
 ### 6. Drive the features, one tester each
 
 One tester per feature, sequentially, never in parallel: they share one browser,
-and session state — being logged in — is what carries between them.
+and session state — being logged in — is what carries between them. Feature mode
+spawns exactly one.
 
 Order the features so that anything others depend on goes first. Authentication,
 onboarding, and navigation shells before the flows that sit behind them; commit
@@ -243,6 +301,7 @@ and reused, with this block appended per feature:
 ```markdown
 ## Your feature
 
+- **Mode:** window | feature
 - **Slug:** <feature-slug>
 - **Case file:** <path, or "none — write the steps as you go">
 - **Base URL:** <url>
@@ -264,8 +323,13 @@ with their evidence paths, the recorded drift, and the blockers. Or:
 | C1 | <text> | issue #1583 |
 ```
 
+`Mode: feature` tells the tester to return a `## Walkthrough` as well — the flow
+in user language. That section is why a feature-mode run happens: it is the
+answer to what the feature does, and the verdicts are the check on it.
+
 Parse the report it returns — the headings are fixed: `## Result`, `## Failures`,
-`## Case drift`, `## Data created`, `## Notes`. Then, before spawning the next:
+`## Case drift`, `## Data created`, `## Notes`, plus `## Walkthrough` in feature
+mode. Then, before spawning the next:
 
 - Append the feature's rows to `run.md`, including its failures in full.
 - Write or update `cases/<slug>.md` from the steps the tester actually took,
@@ -287,7 +351,8 @@ Write the full run file, then print the summary block in chat. Both are below.
 - `PASS` — every tested criterion passed.
 - `FAIL` — any criterion failed.
 - `PARTIAL` — nothing failed, but a feature was `not run`, or the app revision
-  did not match the window end.
+  did not match the window end. Feature mode has no window end to compare
+  against, so only a `not run` puts it there.
 - `not observable` and `out of window` never block a `PASS`; the verdict line
   always carries the tested/total counts, and the **Not tested** section always
   lists them. A pass over four of nine features says so.
@@ -316,6 +381,10 @@ known-good state behind it, so it is the one with a bisectable cause.
 
 | Feature | Source | pass | fail | blocked | not observable | out of window |
 | :--- | :--- | --: | --: | --: | --: | --: |
+
+## How it works
+
+<Feature mode only: the tester's walkthrough, verbatim. Omitted in window mode.>
 
 ## Failures
 
@@ -352,9 +421,18 @@ known-good state behind it, so it is the one with a bisectable cause.
 - <prefix>-<...> — <where it lives>
 ```
 
+Feature mode titles the file `# Test drive — <feature name>`, replaces the
+`Window` line with `**Feature:** <name>`, and reads `Resolved from` as
+`issue #<n>`, `case file <slug>`, or `code search "<terms>"`. It leaves
+**Suspect commits** off a failure unless a ticket names the change or a
+`git log` over the implicated files points at one — there is no window to
+suspect.
+
 The chat summary is the verdict line, regressions first, then the remaining
-failures one line each, then the run directory path. Leave out a section with no
-entries rather than writing "none".
+failures one line each, then the run directory path. In feature mode the
+walkthrough goes directly under the verdict line, ahead of the failures — it is
+what was asked for. Leave out a section with no entries rather than writing
+"none".
 
 `cases/<slug>.md` — a starting point, refined every run:
 
@@ -362,7 +440,7 @@ entries rather than writing "none".
 ---
 feature: <human name>
 slug: <feature-slug>
-source: epic #1582 | pr #341 | derived
+source: epic #1582 | pr #341 | code | derived
 last_run: <timestamp>
 ---
 
@@ -388,4 +466,8 @@ last_run: <timestamp>
 ## References
 
 - Joining commits to pull requests, issues, and epics:
-  [references/grouping.md](references/grouping.md) — read during step 2.
+  [references/grouping.md](references/grouping.md) — read during step 2, and
+  during step 3 in feature mode.
+- Resolving `--feature` to one feature and deriving its criteria from code:
+  [references/feature-mode.md](references/feature-mode.md) — read during step 1
+  in feature mode.

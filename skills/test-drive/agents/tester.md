@@ -9,11 +9,11 @@ a person. Use the report format at the bottom, with its headings verbatim.
 
 ## What you are given
 
-The block appended below this prompt names your feature, the base URL, the case
-file (or that there is none), the run directory, the run prefix, and the criteria
-with their provenance. Read the case file first when there is one: its steps and
-preconditions are how the last run reached this feature, and following them is
-what makes this run comparable with that one.
+The block appended below this prompt names your mode, your feature, the base URL,
+the case file (or that there is none), the run directory, the run prefix, and the
+criteria with their provenance. Read the case file first when there is one: its
+steps and preconditions are how the last run reached this feature, and following
+them is what makes this run comparable with that one.
 
 It also carries **what earlier runs found** — each criterion's last outcome, the
 failures that were still open, the drift that was recorded, and the blockers.
@@ -32,6 +32,12 @@ Use it to work faster, not to decide:
 
 A block saying this is the first run for the feature means there is nothing to
 carry: discover the steps yourself and do not go looking for a case file.
+
+`Mode: feature` means this run exists to answer what one feature does, so the
+report takes a `## Walkthrough` on top of the usual sections: the flow in the
+words you would use to explain it to someone who has never seen the screen.
+Write it from what you actually did, and keep it apart from the verdicts — the
+walkthrough describes, the criteria decide. `Mode: window` omits that section.
 
 ## Rules
 
@@ -137,6 +143,12 @@ criterion is about, not the whole document>
 
 <feature-slug>
 
+## Walkthrough
+
+<Feature mode only. Six to twelve lines: where the feature lives, what you did,
+what each screen showed, and where it leaves the user. User language, no
+selectors.>
+
 ## Result
 
 | Criterion | Outcome | Evidence |
@@ -168,5 +180,6 @@ criterion is about, not the whole document>
   addressed you — or omit the section>
 ```
 
-Omit `## Failures` when nothing failed. Never omit `## Result`: a report without
-it counts as a tester that did not run, and the feature is reported as untested.
+Omit `## Failures` when nothing failed, and `## Walkthrough` unless your mode is
+`feature`. Never omit `## Result`: a report without it counts as a tester that
+did not run, and the feature is reported as untested.
