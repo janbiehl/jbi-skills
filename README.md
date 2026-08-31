@@ -12,6 +12,7 @@ frontmatter, and how workflow skills drive subagents. Read it before adding one.
 
 | Skill | What it does |
 | --- | --- |
+| [`map-feature`](skills/map-feature/SKILL.md) | Reads the codebase to explain how one named feature works end to end, and writes a feature map with a diagram. |
 | [`brainstorm`](skills/brainstorm/SKILL.md) | Interviews you one question at a time until both sides hold the same picture, then writes up the decisions. |
 | [`to-tickets`](skills/to-tickets/SKILL.md) | Breaks a plan into a graph of thin vertical-slice tickets with explicit blocking edges. |
 | [`orchestrate`](skills/orchestrate/SKILL.md) | Drives a GitHub epic to a draft PR, one sub-issue at a time, through implement, review, and verify subagents. |
