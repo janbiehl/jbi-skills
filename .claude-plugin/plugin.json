@@ -1,5 +1,5 @@
 {
-  "name": "jbi-skills",
+  "name": "jbi",
   "description": "Workflow skills for brainstorming a change, mapping a feature, cutting it into tickets, driving it to a PR, and verifying what landed.",
   "author": {
     "name": "Jan Biehl"

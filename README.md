@@ -34,10 +34,10 @@ claude plugin marketplace add janbiehl/jbi-skills
 ```
 
 ```bash
-claude plugin install jbi-skills@jbi
+claude plugin install jbi@janbiehl
 ```
 
-Plugin skills are namespaced: `/jbi-skills:brainstorm`, not `/brainstorm`.
+Plugin skills are namespaced: `/jbi:brainstorm`, not `/brainstorm`.
 
 The repository is private, so whoever installs it needs access to it. Claude
 Code fetches through the git credential helpers already on the machine, but its
@@ -53,11 +53,11 @@ pick it up the same way.
 ```json
 {
   "extraKnownMarketplaces": {
-    "jbi": {
+    "janbiehl": {
       "source": { "source": "github", "repo": "janbiehl/jbi-skills" }
     }
   },
-  "enabledPlugins": { "jbi-skills@jbi": true }
+  "enabledPlugins": { "jbi@janbiehl": true }
 }
 ```
 

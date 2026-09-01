@@ -1,5 +1,5 @@
 {
-  "name": "jbi",
+  "name": "janbiehl",
   "owner": {
     "name": "Jan Biehl",
     "url": "https://github.com/janbiehl"
@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "name": "jbi-skills",
+      "name": "jbi",
       "source": "./",
       "description": "Workflow skills for brainstorming a change, mapping a feature, cutting it into tickets, driving it to a PR, and verifying what landed.",
       "category": "workflow"

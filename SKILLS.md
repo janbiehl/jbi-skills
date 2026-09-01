@@ -154,7 +154,7 @@ Rules:
   project, not the skill directory.
 
 **Installation.** Two paths, and they can coexist. The repository is a plugin
-(`claude plugin install jbi-skills@jbi`), which is how it reaches another
+(`claude plugin install jbi@janbiehl`), which is how it reaches another
 machine, a project, or a colleague. For working *on* a skill, link it instead —
 a link means the next session reads the edit straight out of this repository.
 
@@ -180,7 +180,7 @@ overrides a bundled skill of the same name. That is a reason to namespace
 **The directory name is the command.** For a personal (symlinked) skill, the
 frontmatter `name` field is only a display label — `/skill-name` comes from the
 directory. Installed as a plugin, `name` *does* set the command, namespaced as
-`/jbi-skills:<name>`. Keep the two identical so one skill never becomes two
+`/jbi:<name>`. Keep the two identical so one skill never becomes two
 different commands.
 
 Rules:
