@@ -121,6 +121,9 @@ failure. The token cost of duplication is zero — bodies load only when invoked
 ## 3. Repo layout
 
 ```text
+.claude-plugin/
+  plugin.json         # this repository as a plugin — skills/ is its skill root
+  marketplace.json    # this repository as a marketplace, listing that plugin
 skills/
   <skill-name>/
     SKILL.md          # required — the only file always loaded when triggered
@@ -150,7 +153,12 @@ Rules:
   by a relative path — the working directory at invocation time is the user's
   project, not the skill directory.
 
-**Installation.** Link each skill, do not copy. `scripts/link-skills.sh`
+**Installation.** Two paths, and they can coexist. The repository is a plugin
+(`claude plugin install jbi-skills@jbi`), which is how it reaches another
+machine, a project, or a colleague. For working *on* a skill, link it instead —
+a link means the next session reads the edit straight out of this repository.
+
+Link each skill, do not copy. `scripts/link-skills.sh`
 (macOS, Linux, WSL, Git Bash) and `scripts/link-skills.ps1` (native Windows) do
 this for every skill in `skills/`, or for the ones you name:
 
@@ -171,8 +179,9 @@ overrides a bundled skill of the same name. That is a reason to namespace
 
 **The directory name is the command.** For a personal (symlinked) skill, the
 frontmatter `name` field is only a display label — `/skill-name` comes from the
-directory. Keep `name` identical to the directory name anyway, so nothing drifts
-if a skill later moves into a plugin, where `name` *does* set the command.
+directory. Installed as a plugin, `name` *does* set the command, namespaced as
+`/jbi-skills:<name>`. Keep the two identical so one skill never becomes two
+different commands.
 
 Rules:
 

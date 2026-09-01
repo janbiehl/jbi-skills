@@ -1,0 +1,16 @@
+{
+  "name": "jbi-skills",
+  "description": "Workflow skills for brainstorming a change, mapping a feature, cutting it into tickets, driving it to a PR, and verifying what landed.",
+  "author": {
+    "name": "Jan Biehl"
+  },
+  "homepage": "https://github.com/janbiehl/jbi-skills",
+  "repository": "https://github.com/janbiehl/jbi-skills",
+  "keywords": [
+    "skills",
+    "workflow",
+    "planning",
+    "code-review",
+    "orchestration"
+  ]
+}

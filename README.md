@@ -1,8 +1,8 @@
 # Skills
 
 Personal [Claude Code](https://docs.claude.com/en/docs/claude-code) skills, kept
-in one repository and linked into `~/.claude/skills` so edits here are live in
-the next session.
+in one repository. Install them as a plugin, or link them into `~/.claude/skills`
+so edits here are live in the next session.
 
 [SKILLS.md](SKILLS.md) is the house standard every skill in here follows — what
 qualifies as a skill, how it is named and laid out, what goes in the
@@ -21,6 +21,54 @@ frontmatter, and how workflow skills drive subagents. Read it before adding one.
 
 ## Install
 
+Two ways in, and they can coexist. Install the **plugin** to use the skills on a
+machine. **Link** them when you want to edit them and have the change take
+effect in the next session.
+
+### Plugin
+
+This repository is its own marketplace, so it takes two commands:
+
+```bash
+claude plugin marketplace add janbiehl/jbi-skills
+```
+
+```bash
+claude plugin install jbi-skills@jbi
+```
+
+Plugin skills are namespaced: `/jbi-skills:brainstorm`, not `/brainstorm`.
+
+The repository is private, so whoever installs it needs access to it. Claude
+Code fetches through the git credential helpers already on the machine, but its
+background marketplace refresh runs `git pull` without them over HTTPS. Use an
+SSH remote, or set `CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1` so a
+failed refresh leaves the marketplace in place instead of dropping it.
+
+**Into a project, for everyone who works in it.** Commit this to that project's
+`.claude/settings.json`. Whoever trusts the folder gets the marketplace and the
+plugin without a separate install step, and cloud sessions on that repository
+pick it up the same way.
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "jbi": {
+      "source": { "source": "github", "repo": "janbiehl/jbi-skills" }
+    }
+  },
+  "enabledPlugins": { "jbi-skills@jbi": true }
+}
+```
+
+**Updates.** `plugin.json` carries no `version` on purpose: the git commit is
+the version, so every install resolves to the current `main` and there is
+nothing to bump on release. Run `/reload-plugins` to pick up a change inside a
+live session. Add a `version` field if you ever want installs pinned instead —
+from then on they stay on the cached copy until you bump it.
+
+### Symlinks
+
 Every skill is self-contained, so you can link all of them or just one.
 
 **macOS, Linux, WSL, Git Bash**
@@ -37,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\link-skills.ps1
 
 Then start a new Claude Code session and type `/` to see the skills.
 
-## Usage
+## Link script
 
 Both scripts take the same three commands and act on every skill in `skills/`
 unless you name specific ones.

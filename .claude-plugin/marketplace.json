@@ -1,0 +1,19 @@
+{
+  "name": "jbi",
+  "owner": {
+    "name": "Jan Biehl",
+    "url": "https://github.com/janbiehl"
+  },
+  "metadata": {
+    "description": "Jan Biehl's Claude Code plugins.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "jbi-skills",
+      "source": "./",
+      "description": "Workflow skills for brainstorming a change, mapping a feature, cutting it into tickets, driving it to a PR, and verifying what landed.",
+      "category": "workflow"
+    }
+  ]
+}
