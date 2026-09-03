@@ -16,6 +16,7 @@ frontmatter, and how workflow skills drive subagents. Read it before adding one.
 | [`brainstorm`](skills/brainstorm/SKILL.md) | Interviews you one question at a time until both sides hold the same picture, then writes up the decisions. |
 | [`to-tickets`](skills/to-tickets/SKILL.md) | Breaks a plan into a graph of thin vertical-slice tickets with explicit blocking edges. |
 | [`orchestrate`](skills/orchestrate/SKILL.md) | Drives a GitHub epic to a draft PR, one sub-issue at a time, through implement, review, and verify subagents. |
+| [`handoff`](skills/handoff/SKILL.md) | Writes down where the work stands so the next person, session, or agent can pick it up — and reads one back with `--resume`. |
 | [`verify`](skills/verify/SKILL.md) | Runs the project's own review, build, and test gates, fixes what fails, and reports a per-gate verdict. |
 | [`test-drive`](skills/test-drive/SKILL.md) | Drives the running app through what landed in a time window — or through one named feature — and judges each against its acceptance criteria. |
 
