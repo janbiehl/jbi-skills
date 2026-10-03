@@ -359,7 +359,7 @@ Outcome: captured | partial: <missing axes> | not applicable | not configured | 
 - <gate> — not run: stopped at step 4, this change conflicts with <remote>/<base>
 ```
 
-Leave out a section with no entries rather than writing "none". When the fix loop
+Leave out a section with no entries rather than writing "none". Omit **Visual evidence** when it is not applicable. When the fix loop
 touched no files, drop the **Fixes applied** table and say `PASS`. The bracketed
 clause on the verdict line appears only when the base has moved; **Base** is
 always present, because "up to date" is a fact the reader needs stated.
