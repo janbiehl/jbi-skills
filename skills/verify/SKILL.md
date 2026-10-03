@@ -1,9 +1,9 @@
 ---
 name: verify
 description: Verifies that a change integrates by running the project's own review, format, build, unit, integration, and end-to-end gates, fixing what fails, and re-running only the gates a fix invalidated. Use whenever the user wants a change checked end to end, says 'verify this', 'run the full suite', 'does it still build', 'make it green', 'is this ready for review', or 'prüf das durch'.
-argument-hint: "[branch | PR number]"
+argument-hint: "[branch | PR number] [--install-capture]"
 disable-model-invocation: true
-allowed-tools: Read Grep Glob Bash(git remote:*) Bash(git status:*) Bash(git diff:*) Bash(git log:*) Bash(git fetch:*) Bash(git rev-list:*) Bash(git rev-parse:*) Bash(git merge-tree:*) Bash(gh auth status:*) Bash(gh pr view:*) Bash(glab mr view:*)
+allowed-tools: Read Grep Glob Bash(git remote:*) Bash(git status:*) Bash(git diff:*) Bash(git log:*) Bash(git fetch:*) Bash(git rev-list:*) Bash(git rev-parse:*) Bash(git merge-tree:*) Bash(git check-ignore:*) Bash(mktemp:*) Bash(gh auth status:*) Bash(gh pr view:*) Bash(glab mr view:*)
 ---
 
 # Verify a change integrates
@@ -20,7 +20,9 @@ commits, pushes, or touches branch state.
    test runner is baked in here, and none may be assumed at run time. A gate with
    no declared command is reported `not configured` — never filled in with a
    plausible guess. A green verdict produced by an invented command is worse than
-   no verdict, because it carries authority it did not earn.
+   no verdict, because it carries authority it did not earn. This rule governs
+   the gates. Step 7 is the one place fallbacks are allowed, because it produces
+   evidence rather than a verdict.
 
 2. **Every gate reports one of five outcomes:** `pass`, `fail`, `not configured`,
    `not runnable here`, `not applicable`. Collapsing these into pass/fail hides
@@ -56,7 +58,8 @@ current working tree. Copy this checklist and tick items off as you go:
 - [ ] 4. Check the change against its base
 - [ ] 5. Run the gates fail-fast, fixing and resuming
 - [ ] 6. Re-run only the gates whose evidence went stale
-- [ ] 7. Report
+- [ ] 7. Capture visual evidence (UI changes only)
+- [ ] 8. Report
 
 ### Step 1 — Discover the declared commands
 
@@ -237,7 +240,57 @@ fingerprint: fall back to re-running every gate once, fixing nothing, whenever t
 loop applied a fix, and say in the report that staleness was judged by fix count
 rather than by tree state.
 
-### Step 7 — Report
+### Step 7 — Capture visual evidence (UI changes only)
+
+A frontend change is easier to judge when you can see it. This step is
+**evidence, not a gate**: it never changes the verdict token. It runs after
+step 6, so the images show the tree that was verified. When the change affects
+rendered UI, try hard to produce screenshots. Work down the ladder and stop at
+the first rung that yields images.
+
+**Applicability.** Read `git diff --name-only <remote>/<base>...HEAD`. Decide
+from what the repo actually contains whether the change affects rendered UI. If
+it does not, report `not applicable` and skip the rest.
+
+**Ladder**
+
+1. **Declared capture.** A screenshot, visual-test, or story-build command
+   declared by the project, found with the step 1 precedence.
+2. **Declared app start + available browser.** The project's own dev or preview
+   command, with a headless browser or browser tool already present in this
+   environment, such as a browser MCP tool or a locally installed browser.
+   Navigate to the changed routes or components and capture them.
+3. **Static render.** If the output is static HTML, open the built files
+   directly in an available browser.
+4. **Install a capture tool.** Only when the user opted in with an argument such
+   as `--install-capture`. Install into a temp directory, never into the
+   project's manifests or lockfiles.
+5. **Give up loudly.** Report `not runnable here` with what each rung lacked.
+   Never give up silently.
+
+**Variants.** Derive the axes from the project: its breakpoints, viewport or
+device configs, and theme or colour-scheme support. Include only the axes the
+project has; do not assume desktop, mobile, light, or dark. Cover the changed
+screens or components only. For a large cross product, capture one image per
+axis value and say so.
+
+**Honesty rules**
+
+- Record the rung used for each image. A fallback capture is labelled as such.
+- Check each image is not blank, an error page, or a login wall. A failed
+  render is not evidence.
+- If an axis could not be captured, such as dark mode with no toggle to drive,
+  list it under **Not verified**.
+
+**Boundaries**
+
+- Write only to a git-ignored or out-of-repo path, so the step 6 fingerprint
+  stays valid.
+- Never commit or push images, update visual baselines, or approve snapshot
+  diffs.
+- Never post images as PR comments. List the paths in the report.
+
+### Step 8 — Report
 
 Use the template below verbatim. It is a contract: a caller reads the verdict
 line and the outcome column, so the wording of both is fixed.
@@ -258,6 +311,9 @@ line and the outcome column, so the wording of both is fixed.
   state. It rides on the verdict line and on **Base**, so a caller that reads only
   the verdict still sees that the tree those gates passed against is not the tree
   CI will merge. A base that no longer merges is the one exception, and it fails.
+- Visual evidence never affects the verdict token. Its outcome appears in its own
+  section, and in **Not verified** when it is `not configured`, `not runnable
+  here`, or `partial` on a UI change.
 
 ## Output format
 
@@ -279,6 +335,13 @@ line and the outcome column, so the wording of both is fixed.
 **Evidence:** all gates passed against the final tree — <single pass, tree unchanged | N fixes applied, <gates> re-run>
 **Test files touched:** no | yes — <file, and why the edit was mechanical>
 
+### Visual evidence
+
+| Screen / component | Viewport | Theme | Method | File |
+| :--- | :--- | :--- | :--- | :--- |
+
+Outcome: captured | partial: <missing axes> | not applicable | not configured | not runnable here: <reason>
+
 ### Fixes applied
 
 | # | Gate cleared | Files changed | What changed |
@@ -292,6 +355,7 @@ line and the outcome column, so the wording of both is fixed.
 
 - <gate> — not configured: <what the project never declared>
 - <gate> — not runnable here: <what this environment lacks>
+- visual evidence — <not configured | not runnable here | partial>: <reason or missing axes>
 - <gate> — not run: stopped at step 4, this change conflicts with <remote>/<base>
 ```
 
