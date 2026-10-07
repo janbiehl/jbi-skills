@@ -277,7 +277,7 @@ are triaged the same way, because a correct finding is worth fixing whoever wrot
 it.
 
 **c. Fix.** Spawn one agent with the Agent tool: `subagent_type: general-purpose`,
-`model: sonnet`, prompt = the contents of `${CLAUDE_SKILL_DIR}/agents/fixer.md`
+`model: opus`, prompt = the contents of `${CLAUDE_SKILL_DIR}/agents/fixer.md`
 followed by `owner/repo`, the PR number, the frozen thread list (id, path, line,
 body), the failing check logs from **d** of the previous round if any, and the
 repo root. One worker per round, not one per thread: parallel workers in one tree
@@ -394,7 +394,7 @@ and stop. Never work around it.
 
 ## Subagent contracts
 
-Both workers are pinned to `model: sonnet`. The reason is division of labour, not
+Both workers are pinned to `model: opus`. The reason is division of labour, not
 cost: this session holds the ledger and git, and a session that starts writing
 code loses the one thing that makes the run resumable. Do not set `model` in this
 skill's frontmatter.

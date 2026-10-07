@@ -290,9 +290,7 @@ order otherwise. This is what turns one broken login into one `fail` plus a set
 of `blocked`, instead of nine failures with one cause.
 
 Spawn each with the Agent tool: `subagent_type: general-purpose`,
-`model: sonnet`, `run_in_background: false`. Sonnet because a tester reads a page
-and compares it to a list, dozens of times per feature — the expensive judgement
-already happened when the criteria were written. The main session keeps whatever
+`model: opus`, `run_in_background: false`. The main session keeps whatever
 model it was invoked with.
 
 The prompt is the content of `${CLAUDE_SKILL_DIR}/agents/tester.md`, read once
