@@ -80,22 +80,29 @@ your claude.ai account, which claude.ai packages and stores itself. A session
 downloads that stored copy when it starts and loads it as `jbi@synced`.
 
 So a push to this repository changes nothing in the cloud until claude.ai's
-stored copy is refreshed. Add the repository as a marketplace on your account,
-rather than uploading a zip, so that refresh can happen on its own:
+stored copy is refreshed. The repository is added as a marketplace on the
+account, which is what makes that refresh possible:
 
 1. Open [**Customize > Plugins**](https://claude.ai/customize/plugins) in
    claude.ai or the desktop app.
-2. Select **Add**, then **Add marketplace**, and enter `janbiehl/jbi-skills`.
-   The repository is private, so the dialog asks you to connect GitHub and to
-   give the Claude GitHub App access to it. Do both and retry.
+2. If `jbi-skills` is not listed as a marketplace yet, select **Add**, then
+   **Add marketplace**, and enter `janbiehl/jbi-skills`. The repository is
+   private, so the dialog asks you to connect GitHub and to give the Claude
+   GitHub App access to it. Do both and retry.
 3. Open the marketplace and turn on **Sync automatically**. claude.ai then
    re-syncs the stored copy on every push to the default branch. Without it,
    select **Check for updates** after each push.
 4. Add the `jbi` plugin from that marketplace if it is not already on.
 
-If you uploaded a zip earlier (**Add > Upload plugin**), remove that copy
-first. A zip never updates itself; you would have to upload a new one after
-every change.
+The plugin's page shows which snapshot the account holds: a version counter,
+the skill count, and an **updated** date. If the date lags behind the last
+push to `main`, the sync did not run. Select **Check for updates** on the
+marketplace; if that does not move the version, the Claude GitHub App has
+lost access to the repository. Re-grant it at
+<https://github.com/apps/claude/installations/select_target> and retry.
+
+Do not upload the plugin as a zip (**Add > Upload plugin**). A zip never
+updates itself; you would have to upload a new one after every change.
 
 After a sync, running sessions keep the copy they loaded. Start a new session
 to get the fresh one; a terminal session shows `Plugins changed. Run
