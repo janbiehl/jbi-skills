@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: 'Implements a GitHub epic or issue end to end — fetches its sub-issues, drives them one at a time through Sonnet implementer and verifier subagents onto a run branch, and opens a draft PR. GitHub stays the source of truth and progress is written back to the epic. Invoked without an issue, it lists the open epics in the repository with the pull request each run opened, and starts nothing. Use when the user says implement issue #123, work off this epic, run this epic, pick up the tracking issue, asks which epics there are to run, or invokes /orchestrate with or without an issue number or URL.'
+description: 'Implements a GitHub epic or issue end to end — fetches its sub-issues, drives them one at a time through Opus implementer and verifier subagents onto a run branch, and opens a draft PR. GitHub stays the source of truth and progress is written back to the epic. Invoked without an issue, it lists the open epics in the repository with the pull request each run opened, and starts nothing. Use when the user says implement issue #123, work off this epic, run this epic, pick up the tracking issue, asks which epics there are to run, or invokes /orchestrate with or without an issue number or URL.'
 argument-hint: "[issue URL or #number — omit to list the epics]"
 disable-model-invocation: true
 # The gate is a plain-text stop before any work; nothing may block mid-run.
@@ -331,7 +331,7 @@ For each ticket in order:
 
 1. Set its status to `running` in the ledger comment.
 2. **Implement.** Spawn one agent with the Agent tool: `subagent_type:
-   general-purpose`, `model: sonnet`, prompt = the contents of
+   general-purpose`, `model: opus`, prompt = the contents of
    `${CLAUDE_SKILL_DIR}/agents/implementer.md` followed by the ticket's issue
    number, `owner/repo`, the epic's number, the verify commands, and the repo root.
 3. **Review.** Spawn a second agent the same way with
@@ -478,7 +478,7 @@ coverage of work that was never attempted.
 
 ## Subagent contracts
 
-All three workers are pinned to `model: sonnet`. The reason is division of labour,
+All three workers are pinned to `model: opus`. The reason is division of labour,
 not cost: this session holds the plan, the ledger, and git, and a run where the
 orchestrator starts implementing loses the one clean rollback point it has. Keep
 yourself on the session's model — do not set `model` in this skill's frontmatter.
