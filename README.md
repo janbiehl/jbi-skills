@@ -75,26 +75,27 @@ validate` warns about the missing field; that warning is expected here.)
 
 Cloud sessions (claude.ai/code, the mobile app, routines, Cowork) do not
 install plugins from GitHub and do not read a repository's
-`extraKnownMarketplaces`. The only plugins they load are the ones turned on for
-your claude.ai account or organization, which claude.ai packages and stores
-itself. A session downloads that stored copy when it starts and loads it as
-`jbi@synced`.
+`extraKnownMarketplaces`. The only plugins they load are the ones added to
+your claude.ai account, which claude.ai packages and stores itself. A session
+downloads that stored copy when it starts and loads it as `jbi@synced`.
 
 So a push to this repository changes nothing in the cloud until claude.ai's
-stored copy is refreshed. Wire it up once so that happens on every push:
+stored copy is refreshed. Add the repository as a marketplace on your account,
+rather than uploading a zip, so that refresh can happen on its own:
 
-1. Open [**Organization settings > Plugins & skills**](https://claude.ai/admin-settings/skills?tab=inventory)
-   as an Owner.
-2. Select **Add**, then **Sync from GitHub**, and pick `janbiehl/jbi-skills`.
-   If it is missing, install the Claude GitHub App on the repository via
-   **Repository missing?** and return to the dialog.
-3. Leave **Sync automatically** on. Claude creates a webhook, and every push to
-   the default branch re-syncs the stored copy. If it was added without that,
-   open the marketplace on the [**Marketplaces**](https://claude.ai/admin-settings/skills?tab=marketplaces)
-   tab, turn on **Sync automatically**, and if it shows **No webhook yet**,
-   select **Configure webhook**, then **Enable webhook**.
-4. Set the plugin's availability so your account gets it, then turn it on under
-   **Customize > Plugins** if it is not installed by default.
+1. Open [**Customize > Plugins**](https://claude.ai/customize/plugins) in
+   claude.ai or the desktop app.
+2. Select **Add**, then **Add marketplace**, and enter `janbiehl/jbi-skills`.
+   The repository is private, so the dialog asks you to connect GitHub and to
+   give the Claude GitHub App access to it. Do both and retry.
+3. Open the marketplace and turn on **Sync automatically**. claude.ai then
+   re-syncs the stored copy on every push to the default branch. Without it,
+   select **Check for updates** after each push.
+4. Add the `jbi` plugin from that marketplace if it is not already on.
+
+If you uploaded a zip earlier (**Add > Upload plugin**), remove that copy
+first. A zip never updates itself; you would have to upload a new one after
+every change.
 
 After a sync, running sessions keep the copy they loaded. Start a new session
 to get the fresh one; a terminal session shows `Plugins changed. Run
@@ -110,6 +111,10 @@ Three things to know about the synced copy:
   tracking `main`.
 - **No top-level `bin/`.** claude.ai rejects a plugin that has one. Keep
   executables under `scripts/`, as this repository does.
+
+On Team and Enterprise plans an Owner can instead sync the repository for the
+whole organization from **Organization settings > Plugins & skills**; see
+[Sync your organization's plugins from a repository](https://claude.com/docs/plugins/org-sync).
 
 ### Symlinks
 
