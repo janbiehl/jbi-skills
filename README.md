@@ -49,8 +49,9 @@ failed refresh leaves the marketplace in place instead of dropping it.
 
 **Into a project, for everyone who works in it.** Commit this to that project's
 `.claude/settings.json`. Whoever trusts the folder gets the marketplace and the
-plugin without a separate install step, and cloud sessions on that repository
-pick it up the same way.
+plugin without a separate install step. This does not reach cloud sessions:
+they never show the trust dialog, so they ignore `extraKnownMarketplaces`. For
+cloud sessions see [Cloud sessions](#cloud-sessions) below.
 
 ```json
 {
@@ -67,7 +68,48 @@ pick it up the same way.
 the version, so every install resolves to the current `main` and there is
 nothing to bump on release. Run `/reload-plugins` to pick up a change inside a
 live session. Add a `version` field if you ever want installs pinned instead —
-from then on they stay on the cached copy until you bump it.
+from then on they stay on the cached copy until you bump it. (`claude plugin
+validate` warns about the missing field; that warning is expected here.)
+
+### Cloud sessions
+
+Cloud sessions (claude.ai/code, the mobile app, routines, Cowork) do not
+install plugins from GitHub and do not read a repository's
+`extraKnownMarketplaces`. The only plugins they load are the ones turned on for
+your claude.ai account or organization, which claude.ai packages and stores
+itself. A session downloads that stored copy when it starts and loads it as
+`jbi@synced`.
+
+So a push to this repository changes nothing in the cloud until claude.ai's
+stored copy is refreshed. Wire it up once so that happens on every push:
+
+1. Open [**Organization settings > Plugins & skills**](https://claude.ai/admin-settings/skills?tab=inventory)
+   as an Owner.
+2. Select **Add**, then **Sync from GitHub**, and pick `janbiehl/jbi-skills`.
+   If it is missing, install the Claude GitHub App on the repository via
+   **Repository missing?** and return to the dialog.
+3. Leave **Sync automatically** on. Claude creates a webhook, and every push to
+   the default branch re-syncs the stored copy. If it was added without that,
+   open the marketplace on the [**Marketplaces**](https://claude.ai/admin-settings/skills?tab=marketplaces)
+   tab, turn on **Sync automatically**, and if it shows **No webhook yet**,
+   select **Configure webhook**, then **Enable webhook**.
+4. Set the plugin's availability so your account gets it, then turn it on under
+   **Customize > Plugins** if it is not installed by default.
+
+After a sync, running sessions keep the copy they loaded. Start a new session
+to get the fresh one; a terminal session shows `Plugins changed. Run
+/reload-plugins to activate.` instead.
+
+Three things to know about the synced copy:
+
+- **Only the default branch syncs.** Work on a branch is invisible to cloud
+  sessions until it merges to `main`.
+- **`version` is irrelevant here.** For a plugin hosted on claude.ai the
+  manifest's `version` is not read; claude.ai records its own version per sync.
+  Leaving the field out costs nothing on this path and keeps git installs
+  tracking `main`.
+- **No top-level `bin/`.** claude.ai rejects a plugin that has one. Keep
+  executables under `scripts/`, as this repository does.
 
 ### Symlinks
 
