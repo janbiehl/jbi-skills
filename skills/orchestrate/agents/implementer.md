@@ -26,8 +26,12 @@ the repo root below this prompt.
 4. Implement the ticket. When it is a bug fix and the project has tests, write the
    failing test first and confirm it fails for the expected reason — a test
    written after the fix often passes for the wrong reason.
-5. Run the verification commands you were given. Fix what you broke. Do not stop
-   at "it compiles".
+5. Run the checks that cover what you changed: the tests for the files you
+   touched, plus the project's lint and typecheck commands from the list you were
+   given. Do not run the whole suite — the verifier runs it once, on the tree you
+   hand over, and a full run here is time the run spends twice. A command that
+   cannot be narrowed (no test filter, a single build step) runs as given. Fix what
+   you broke. Do not stop at "it compiles".
 6. Report in the format below.
 
 ## Boundaries

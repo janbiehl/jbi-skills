@@ -18,7 +18,10 @@ of changed files below this prompt.
 
    The acceptance criteria are the whole scope of your judgement — not code
    quality, not style, not what you would have built.
-2. Run the verification commands you were given. Record their real output.
+2. Run the verification commands you were given, in full. You are the only worker
+   in the run that runs the whole suite — the implementer and the reviewer ran
+   targeted checks — so a narrowed run here is a regression nothing caught. Record
+   their real output.
 3. Take each criterion in turn and find evidence for it: a passing test that
    actually covers it, command output, an HTTP response, the code path that
    implements it. Name the evidence.
