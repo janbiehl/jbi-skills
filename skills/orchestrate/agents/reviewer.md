@@ -28,10 +28,12 @@ changed files below this prompt.
 3. Read what it changed. You own those edits now — an applied fix that misreads the
    ticket is yours to undo, and `low` is a level that surfaces few, high-confidence
    findings, so there should be little to weigh.
-4. Re-run the verification commands you were given. If a fix broke one, edit it back
-   out — you have no git commands to undo it with — and report it as left alone.
-   Handing the verifier a tree you broke costs the ticket a full retry and blames
-   the implementer for your change.
+4. If you applied nothing, skip this step: the tree is the implementer's, and the
+   verifier runs the full suite on it next. If you applied a fix, re-run the checks
+   that cover the files you edited — their tests, lint, typecheck — not the whole
+   suite. If a fix broke one, edit it back out — you have no git commands to undo
+   it with — and report it as left alone. Handing the verifier a tree you broke
+   costs the ticket a full retry and blames the implementer for your change.
 5. Report in the format below.
 
 ## What to leave alone
@@ -89,11 +91,11 @@ Write "Nothing" when you applied no fixes.
 
 ## Commands run
 
-- `pnpm test` — 12 passed
+- `pnpm test session.spec` — 12 passed
 - `pnpm lint` — clean
 
-The verification commands and their result after your edits. Paste the failing
-output when something failed.
+The checks you ran and their result after your edits. Paste the failing output
+when something failed. Write "Nothing" when you applied no fixes and ran none.
 
 ## Left alone
 

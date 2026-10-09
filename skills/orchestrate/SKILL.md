@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: 'Implements a GitHub epic or issue end to end — fetches its sub-issues, drives them one at a time through Opus implementer and verifier subagents onto a run branch, and opens a draft PR. GitHub stays the source of truth and progress is written back to the epic. Invoked without an issue, it lists the open epics in the repository with the pull request each run opened, and starts nothing. Use when the user says implement issue #123, work off this epic, run this epic, pick up the tracking issue, asks which epics there are to run, or invokes /orchestrate with or without an issue number or URL.'
+description: 'Implements a GitHub epic or issue end to end — fetches its sub-issues, drives them one at a time through Opus implementer and verifier subagents and a Sonnet reviewer onto a run branch, and opens a draft PR. GitHub stays the source of truth and progress is written back to the epic. Invoked without an issue, it lists the open epics in the repository with the pull request each run opened, and starts nothing. Use when the user says implement issue #123, work off this epic, run this epic, pick up the tracking issue, asks which epics there are to run, or invokes /orchestrate with or without an issue number or URL.'
 argument-hint: "[issue URL or #number — omit to list the epics]"
 disable-model-invocation: true
 # The gate is a plain-text stop before any work; nothing may block mid-run.
@@ -205,8 +205,11 @@ close it and stop.
 
 Read enough of the codebase to judge whether each ticket is buildable and to name
 the project's own verification commands (`package.json` scripts, `Makefile`,
-`CLAUDE.md`, the CI workflow). Record those commands once, in the ledger; both
-workers get them, so a ticket is never verified by a command someone invented.
+`CLAUDE.md`, the CI workflow). Record those commands once, in the ledger; all
+three workers get them, so a ticket is never verified by a command someone
+invented. Only the verifier runs them in full — the implementer and the reviewer
+run the parts that cover what they touched, so the suite runs once per ticket,
+not three times.
 
 Check each ticket for acceptance criteria. One with none cannot be verified
 mechanically — raise it as a risk at the gate instead of inventing criteria for
@@ -236,8 +239,10 @@ spawn a worker, until the user replies.
 Branch `orchestrate/1582-<slug>`, one commit per passed ticket, pushed as it goes;
 a draft PR opens once the first ticket lands. Progress is written back to a single
 comment on #1582. Each ticket is reviewed with `/code-review low --fix` over its
-own diff and then verified with `<the project's own commands>`. CI is checked once,
-after the last ticket, and a run that finishes every ticket ends with
+own diff and then verified with `<the project's own commands>`; the verifier is the
+only worker that runs the full suite. CI is read once, after the last ticket, and
+not waited on — pending checks are reported pending, and `/babysit` is the tool for
+driving them. A run that finishes every ticket ends with
 `/code-review medium --comment`, which posts a first pass of review comments on
 the PR.
 
@@ -334,7 +339,8 @@ For each ticket in order:
    general-purpose`, `model: opus`, prompt = the contents of
    `${CLAUDE_SKILL_DIR}/agents/implementer.md` followed by the ticket's issue
    number, `owner/repo`, the epic's number, the verify commands, and the repo root.
-3. **Review.** Spawn a second agent the same way with
+3. **Review.** Spawn a second agent with `subagent_type: general-purpose`,
+   `model: sonnet`, prompt = the contents of
    `${CLAUDE_SKILL_DIR}/agents/reviewer.md`, plus the ticket's issue number,
    `owner/repo`, the verify commands, and the implementer's `## Files changed`
    list verbatim. It runs `/code-review low --fix` over the uncommitted diff — at
@@ -344,14 +350,17 @@ For each ticket in order:
    Keep the review out of your own context. This session holds the plan, the
    ledger, and git, and a review pass inlined here for every ticket is a chance
    per ticket to compact away the only copy of the run.
-4. **Verify.** Spawn a third agent the same way with
+4. **Verify.** Spawn a third agent with `subagent_type: general-purpose`,
+   `model: opus`, prompt = the contents of
    `${CLAUDE_SKILL_DIR}/agents/verifier.md`, plus the ticket's issue number,
    `owner/repo`, the verify commands, and the implementer's and reviewer's
    `## Files changed` lists together. Verification runs last so that it judges the
    tree that will actually be committed, review fixes included. Never reuse the
    implementer or the reviewer for this — an agent that wrote the code will pass
    its own work. The verifier may list a review fix under `## Out of scope`; that
-   is expected and does not fail the ticket.
+   is expected and does not fail the ticket. This is the one full run of the
+   verify commands per ticket; the two workers before it ran only the checks
+   covering their own edits.
 5. **Act on the verdict.**
 
 **PASS** — confirm the workers left git alone (`git log -1 --format=%H` still
@@ -389,8 +398,10 @@ git clean -fd -- <paths either report lists as new>
 ```
 
 Spawn a fresh implementer with the same ticket plus the verifier's `## Reason` and
-failing criteria, then review and verify again as before. A second FAIL stops the
-run.
+failing criteria, then verify again. Skip the reviewer on a retry: the diff is
+largely the one the first pass already reviewed, the verifier is the gate either
+way, and a retry is the slowest path through the loop. Stage the retry's
+implementer paths alone. A second FAIL stops the run.
 
 **FAIL, blamed on an earlier ticket** — the verifier's `## Blame` says the cause is
 already committed. Fix forward once: spawn an implementer scoped to that regression
@@ -419,11 +430,16 @@ The body states the goal, links the epic, lists every ticket with its outcome, a
 closes the passed ones (`Closes #1583`). A stopped run says so in the body — a PR
 that claims to close an epic it half-applied is the most expensive kind of wrong.
 
-Then check CI once — this is the only place CI gates anything:
+Then read CI as it stands, without waiting on it:
 
 ```sh
-gh pr checks --watch
+gh pr checks
 ```
+
+It exits non-zero while checks are pending or failing; that is state to report,
+not an error to retry. Do not `--watch`: a run blocked on a runner queue is doing
+nothing a person could not, and driving checks to green is what `/babysit` is for.
+Report pending checks as pending, with the PR URL.
 
 On a run where every ticket passed and a PR exists, get a first review of what the
 branch now contains. Each ticket's own review saw one diff in isolation; this is the
@@ -461,7 +477,7 @@ Epic #1582 · branch `orchestrate/1582-auth-rebuild` · <PR url, or why there is
 | #1586 Rate limiting | failed | — |
 | #1587 Audit log | not run | — |
 
-**CI:** <green | the failing checks | not run>
+**CI:** <green | the failing checks | pending | not run>
 
 **Review:** <N comments posted on the PR by `/code-review medium --comment` |
 skipped, run stopped at #1586 | skipped, no PR>
@@ -470,7 +486,8 @@ skipped, run stopped at #1586 | skipped, no PR>
 
 **Why it stopped:** <the verifier's reason, verbatim, on a stopped run>
 
-**Next:** <the single most useful command or decision for the user>
+**Next:** <the single most useful command or decision for the user — on a
+complete run with CI pending or red, that is `/babysit <pr number>`>
 ```
 
 Report every ticket that did not run. A summary that omits them reads as complete
@@ -478,10 +495,22 @@ coverage of work that was never attempted.
 
 ## Subagent contracts
 
-All three workers are pinned to `model: opus`. The reason is division of labour,
-not cost: this session holds the plan, the ledger, and git, and a run where the
-orchestrator starts implementing loses the one clean rollback point it has. Keep
-yourself on the session's model — do not set `model` in this skill's frontmatter.
+The implementer and the verifier are pinned to `model: opus`; the reviewer runs
+on `model: sonnet`. Pinning workers at all is division of labour, not cost: this
+session holds the plan, the ledger, and git, and a run where the orchestrator
+starts implementing loses the one clean rollback point it has. Keep yourself on
+the session's model — do not set `model` in this skill's frontmatter.
+
+The reviewer is the one worker a faster model can hold. It applies few,
+high-confidence fixes over a small diff, and the verifier judges the tree after
+it, so a weak review costs at most a retry, never a bad commit. The implementer
+and the verifier stay on Opus: one writes the code, the other is the gate.
+
+The verify commands run in full exactly once per ticket, in the verifier. The
+implementer runs the tests covering the files it changed plus lint and typecheck;
+the reviewer re-runs only after it applied a fix, and only over what it edited.
+Three full suite runs per ticket was most of a run's wall clock, and the two
+early runs caught nothing the verifier would not.
 
 Workers fetch their own ticket with `gh issue view`, which is why they are given an
 issue number rather than a file. It also means a ticket edited on GitHub mid-run
