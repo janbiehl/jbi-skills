@@ -1,7 +1,7 @@
 ---
 name: roundtable
 description: Convenes a panel of subagents, each arguing one perspective — UX, software architect, domain expert, customer, or whatever the topic needs — over several rounds in which every panelist reads the others' statements and answers them, then maps which aspect matters to which perspective and where they still disagree. Use whenever the user wants a topic, feature, or decision looked at from several angles or roles, asks what UX, architecture, or the customer would say, or says "from different perspectives", "panel", "roundtable", "verschiedene Blickwinkel", "verschiedene Sichtweisen", or "lass das mal von mehreren Seiten betrachten".
-argument-hint: "[topic, file, or decision] [as: perspective, perspective, …] [rounds: N]"
+argument-hint: "[topic, file, or decision] [as: perspective, perspective (model), …] [rounds: N] [model: opus|sonnet|haiku]"
 allowed-tools: Read Grep Glob Agent
 ---
 
@@ -81,9 +81,10 @@ having an opinion on everything, which is what makes the final aspect map sharp.
 ### 3. Gate: show topic and cast, wait for go
 
 A panel of four over three rounds is twelve subagents. Post the question, the
-brief's constraints, the persona cards, and the planned number of rounds, then
-stop and wait. The user may swap a perspective, sharpen the question, or change
-the rounds — fold that in and start.
+brief's constraints, the persona cards with the model each panelist runs on (see
+**Panelist model**), and the planned number of rounds, then stop and wait. The
+user may swap a perspective, sharpen the question, change the rounds, or change a
+model — fold that in and start.
 
 Skip the wait only when the invocation itself already fixed both the topic and
 the cast; then post the same summary and start straight away.
@@ -91,7 +92,8 @@ the cast; then post the same summary and start straight away.
 ### 4. Round 1 — independent statements
 
 Read [agents/panelist.md](agents/panelist.md). For each panelist, spawn a
-`general-purpose` agent whose prompt is that file's content followed by:
+`general-purpose` agent with that panelist's `model` (see **Panelist model**)
+whose prompt is that file's content followed by:
 
 ```markdown
 ## Your perspective
@@ -124,8 +126,8 @@ aspect map at the end. Add new aspects as they surface; do not rename old ones.
 
 ### 5. Rounds 2…N — answer each other
 
-Each later round, spawn every panelist again — fresh agents, in parallel — with
-the same prompt as round 1, the round line changed to `<n> of at most <N>`, and
+Each later round, spawn every panelist again — fresh agents, in parallel, each on
+the same model as in round 1 — with the same prompt as round 1, the round line changed to `<n> of at most <N>`, and
 two more sections:
 
 ```markdown
@@ -191,6 +193,26 @@ rather than pasting them — they are long, and the map is the point.
 - **Report what was cut.** A panelist re-spawned, a report taken as-is despite
   drifting, a round skipped — say so in the synthesis.
 
+## Panelist model
+
+Panelists run on `model: opus` unless the invocation says otherwise. Their job is
+to reason from one stake and to change position only on an argument, and a weaker
+model is the first to fold into agreement — which is exactly the failure that
+makes a panel worthless. Keep yourself on the session's model; do not set `model`
+in this skill's frontmatter.
+
+The invocation can override this two ways, and the more specific one wins:
+
+- `model: sonnet` (or `haiku`, `opus`) — for every panelist. The usual reason is
+  cost on a large panel or a low-stakes topic.
+- `as: UX (sonnet), Architect, Customer (haiku)` — for one perspective. A
+  perspective without a model in parentheses takes the panel-wide one.
+
+Accept only `opus`, `sonnet`, and `haiku`, the values the Agent tool's `model`
+takes. Anything else — a full model ID, a typo — goes back to the user at the gate
+with the three valid values; do not guess the closest one. A panelist keeps its
+model for every round, so a change in its position never comes from a model swap.
+
 ## Output format
 
 Leave out a section with no entries rather than writing "none".
@@ -198,7 +220,7 @@ Leave out a section with no entries rather than writing "none".
 ```markdown
 ## Roundtable: <the question>
 
-<Panel: UX designer, Software architect, Domain expert, Customer · <n> rounds · <converged | stopped on real tensions | hit the round limit>>
+<Panel: UX designer (opus), Software architect (opus), Domain expert (opus), Customer (sonnet) · <n> rounds · <converged | stopped on real tensions | hit the round limit>>
 
 ### Where the panel landed
 
