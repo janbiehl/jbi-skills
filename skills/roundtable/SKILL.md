@@ -1,7 +1,7 @@
 ---
 name: roundtable
 description: Convenes a panel of subagents, each arguing one perspective — UX, software architect, domain expert, customer, or whatever the topic needs — over several rounds in which every panelist reads the others' statements and answers them, then maps which aspect matters to which perspective and where they still disagree. Use whenever the user wants a topic, feature, or decision looked at from several angles or roles, asks what UX, architecture, or the customer would say, or says "from different perspectives", "panel", "roundtable", "verschiedene Blickwinkel", "verschiedene Sichtweisen", or "lass das mal von mehreren Seiten betrachten".
-argument-hint: "[topic, file, or decision] [as: perspective, perspective (model), …] [rounds: N] [model: opus|sonnet|haiku]"
+argument-hint: "[topic, file, or decision] [as: perspective, perspective (model), …] [rounds: N] [model: opus|sonnet]"
 allowed-tools: Read Grep Glob Agent
 ---
 
@@ -203,14 +203,15 @@ in this skill's frontmatter.
 
 The invocation can override this two ways, and the more specific one wins:
 
-- `model: sonnet` (or `haiku`, `opus`) — for every panelist. The usual reason is
+- `model: sonnet` (or `opus`) — for every panelist. The usual reason is
   cost on a large panel or a low-stakes topic.
-- `as: UX (sonnet), Architect, Customer (haiku)` — for one perspective. A
+- `as: UX (sonnet), Architect, Customer (opus)` — for one perspective. A
   perspective without a model in parentheses takes the panel-wide one.
 
-Accept only `opus`, `sonnet`, and `haiku`, the values the Agent tool's `model`
-takes. Anything else — a full model ID, a typo — goes back to the user at the gate
-with the three valid values; do not guess the closest one. A panelist keeps its
+Accept only `opus` and `sonnet`. `haiku` is left out on purpose: it summarizes
+well but argues weakly, so a perspective on it gets talked over and the aspect
+map under-weights it. Anything else — `haiku`, a full model ID, a typo — goes back
+to the user at the gate with the two valid values; do not guess the closest one. A panelist keeps its
 model for every round, so a change in its position never comes from a model swap.
 
 ## Output format
