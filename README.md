@@ -20,6 +20,7 @@ frontmatter, and how workflow skills drive subagents. Read it before adding one.
 | [`babysit`](skills/babysit/SKILL.md) | Works a GitHub pull request toward mergeable in rounds — rebase, fix and answer the review comments, fix red CI, post a fresh review — and merges it with `--merge`. |
 | [`verify`](skills/verify/SKILL.md) | Runs the project's own review, build, and test gates, fixes what fails, and reports a per-gate verdict. |
 | [`test-drive`](skills/test-drive/SKILL.md) | Drives the running app through what landed in a time window — or through one named feature — and judges each against its acceptance criteria. |
+| [`roundtable`](skills/roundtable/SKILL.md) | Puts a topic in front of a panel of subagents — UX, architect, domain expert, customer — over rounds in which each answers the others, then maps which aspect belongs to which perspective. |
 
 ## Install
 
