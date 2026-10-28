@@ -1,8 +1,8 @@
 ---
 name: roundtable
 description: Convenes a panel of subagents, each arguing one perspective — UX, software architect, domain expert, customer, or whatever the topic needs — over several rounds in which every panelist reads the others' statements and answers them, then maps which aspect matters to which perspective and where they still disagree. Use whenever the user wants a topic, feature, or decision looked at from several angles or roles, asks what UX, architecture, or the customer would say, or says "from different perspectives", "panel", "roundtable", "verschiedene Blickwinkel", "verschiedene Sichtweisen", or "lass das mal von mehreren Seiten betrachten".
-argument-hint: "[topic, file, or decision] [as: perspective, perspective (model), …] [rounds: N] [model: opus|sonnet]"
-allowed-tools: Read Grep Glob Agent
+argument-hint: "[topic, file, or decision] [as: perspective, perspective, …] [rounds: N]"
+allowed-tools: Read Grep Glob Agent mcp__ccd_session__spawn_task
 ---
 
 # Roundtable
@@ -11,8 +11,9 @@ Puts one topic in front of a panel of subagents, each holding one perspective.
 Round 1 is independent: nobody sees anyone else. From round 2 on, every panelist
 reads every other panelist's last statement and answers it — agrees, pushes back,
 or moves. The rounds stop when positions stop moving. The output is not a
-transcript but a map: which aspect belongs to which perspective, where the panel
-landed, and which tensions are real trade-offs rather than misunderstandings.
+transcript but a decision page that fits on one screen: the verdict first, the
+calls only the user can make, and the tensions that are real trade-offs rather
+than misunderstandings. The full aspect map and the statements stay on request.
 
 You run the table; you are not on the panel. Do not argue a perspective yourself
 — your view goes in the recommendation at the end, clearly marked as yours.
@@ -26,7 +27,9 @@ Copy this checklist into your reply and tick items off:
 - [ ] 3. Gate: show topic and cast, wait for go
 - [ ] 4. Round 1 — independent statements
 - [ ] 5. Rounds 2…N — answer each other
-- [ ] 6. Synthesize
+- [ ] 6. Check the load-bearing claims
+- [ ] 7. Synthesize
+- [ ] 8. Queue the work as cards
 
 ### 1. Frame the topic and write the brief
 
@@ -80,23 +83,23 @@ having an opinion on everything, which is what makes the final aspect map sharp.
 
 ### 3. Gate: show topic and cast, wait for go
 
-A panel of four over three rounds is twelve subagents. Post the question, the
-brief's constraints, the persona cards with the model each panelist runs on (see
-**Panelist model**), and the planned number of rounds, then stop and wait. The
-user may swap a perspective, sharpen the question, change the rounds, or change a
-model — fold that in and start.
+A panel of four over three rounds is twelve Opus subagents. Post the question,
+the brief's constraints, the persona cards, and the planned number of rounds,
+then stop and wait. The user may swap a perspective, sharpen the question, or
+change the rounds — fold that in and start.
 
 Skip the wait only when the invocation itself already fixed both the topic and
-the cast, and every model and round count it names is valid (see **Panelist
-model** and the two-round minimum in step 5); then post the same summary and
-start straight away. An invalid value always means waiting: bounce it here,
-before any panelist spawns.
+the cast, and any round count it names is valid (see the two-round minimum in
+step 5); then post the same summary and start straight away. An invalid round
+count always means waiting: bounce it here, before any panelist spawns. A model
+named in the invocation is not invalid, just not honored — say in one line that
+panelists are pinned to Opus (see **Panelist model**) and go on.
 
 ### 4. Round 1 — independent statements
 
 Read `${CLAUDE_SKILL_DIR}/agents/panelist.md` ([agents/panelist.md](agents/panelist.md)).
-For each panelist, spawn an `Explore` agent with that panelist's `model` (see
-**Panelist model**) whose prompt is that file's content followed by:
+For each panelist, spawn an `Explore` agent with `model: opus` (see **Panelist
+model**) whose prompt is that file's content followed by:
 
 ```markdown
 ## Your perspective
@@ -131,8 +134,8 @@ is what lets you build the aspect map at the end. Add new aspects as they surfac
 
 ### 5. Rounds 2…N — answer each other
 
-Each later round, spawn every panelist again — fresh agents, in parallel, each on
-the same model as in round 1 — with the same prompt as round 1, the round line
+Each later round, spawn every panelist again — fresh agents, in parallel, on
+`model: opus` as in round 1 — with the same prompt as round 1, the round line
 changed to `<n> of at most <N>`, and these sections:
 
 ```markdown
@@ -165,6 +168,10 @@ never ends the run — nobody has answered anybody yet, and its `## Moved` says
   appeared → converged; stop.
 - Disagreements remain but are the same ones as last round, restated → they are
   real tensions, not misunderstandings; stop, another round will only repeat them.
+- Every remaining disagreement hinges on a fact or decision the panel cannot get
+  — a field report, a choice in a later ticket, the user's authority → stop;
+  another round can only speculate. Name that fact under the tension's
+  "Settles when".
 - Otherwise run the next round, up to the maximum.
 
 Default maximum: 3 rounds. Use the number the invocation names, if any. Two rounds
@@ -179,16 +186,67 @@ strongest case against that agreement from your perspective before deciding whet
 Agreement that survives that is worth something; agreement that was never tested
 is four models being polite.
 
-### 6. Synthesize
+### 6. Check the load-bearing claims
+
+Panelists argue from what they read, and often from what they assume. Before
+writing anything, list the factual claims the verdict or a tension rests on —
+"the updater can evaluate the new closure before switching", "restore never
+wipes the data directory" — and check each one you can with Read, Grep, and
+Glob. A claim you can settle by reading the code is your job, not a question for
+the user.
+
+Mark each as **verified** (with the `path:line` that shows it), **refuted**, or
+**unverified** (could not be checked from here). A refuted claim changes the
+synthesis: say which position it undercuts. Only unverified claims that the
+verdict depends on go into the output; the rest stays out.
+
+### 7. Synthesize
 
 Read every round, then write the result in the format below. You are the only
 one who has seen the whole table, so the synthesis is where you earn the run:
-name the tensions precisely, say which perspective owns which aspect, and give
-your own recommendation, marked as yours.
+lead with the verdict, hand the user only the calls that are theirs, and name
+the tensions precisely.
+
+The reader is deciding, not auditing the run. Keep the chat synthesis to about
+250 words — one screen. Each item appears once: a follow-up named in the verdict
+is not repeated under tensions or questions. Leave out process: how positions
+moved, which panelist said what in which round, and the run notes, unless one
+of them changes how far the verdict can be trusted.
 
 Report in chat. If the user wants it on disk, write it where they say; do not
-create files unprompted. Offer the full round-by-round statements on request
-rather than pasting them — they are long, and the map is the point.
+create files unprompted. The aspect map, the position moves, and the full
+round-by-round statements are kept for the asking — offer them in the footer
+line, and when asked, use the formats under **On request**.
+
+### 8. Queue the work as cards
+
+The verdict names work; a card lets the user start it in one click. If the
+session has a task-suggestion tool — Claude desktop's `spawn_task`, which shows a
+"Suggested task" card — queue cards right after posting the synthesis. Without
+one, skip this step; the **Do now** and **Follow-up** lines are the list.
+
+- **Do now** → one card for all its items together. They land in the same change,
+  so one session should make them. The prompt names the PR or branch under
+  discussion as the place to push.
+- **Follow-up** → one card per item, in the order the verdict gives. Each is its
+  own change, from the default branch.
+- Not **Your call**, **Don't**, or **Open tensions** — nothing there is decided.
+  When the user later settles a **Your call** entry, queue a card for the
+  outcome then.
+
+A card's session starts fresh, on a checkout that may not have this session's
+context, so its prompt stands alone: the roundtable question and verdict in one
+line each, the item and why the panel wants it, the repository-relative files
+involved (with the `path:line` evidence from step 6), the claims marked
+unverified that the item rests on — verifying them is its first step — and what
+done looks like. No absolute paths, no panelist statements pasted in. Title: a
+short imperative under 60 characters. TLDR: one or two plain sentences on what
+it does and why.
+
+Queuing a card is a suggestion, never the work itself: do not start any of it
+in this session. Mark each carded item in the synthesis with `(card)`. If the
+user disagrees with the verdict afterwards, withdraw the cards it no longer
+supports with `dismiss_task`.
 
 ## Ground rules
 
@@ -207,79 +265,80 @@ rather than pasting them — they are long, and the map is the point.
   next round's prompt. The only things you add are the aspect list and, under
   `## Moderator note`, the premature-consensus line above.
 - **Report what was cut.** A panelist re-spawned, a statement taken as-is despite
-  drifting, a round skipped — say so in the synthesis.
+  drifting, a round skipped, instruction-like text removed — say so in the
+  footer. Report exceptions only: "no instruction-like text found" and
+  scratchpad paths are noise.
 
 ## Panelist model
 
-Panelists run on `model: opus` unless the invocation says otherwise. Their job is
-to reason from one stake and to change position only on an argument, and a weaker
-model is the first to fold into agreement — which is exactly the failure that
-makes a panel worthless. Keep yourself on the session's model; do not set `model`
-in this skill's frontmatter.
+Every panelist runs on `model: opus`, in every round, with no override. Their job
+is to reason from one stake and to change position only on an argument, and a
+weaker model is the first to fold into agreement — which is exactly the failure
+that makes a panel worthless. A Sonnet panel run side by side with an Opus one on
+the same topic marked nearly every aspect "settled" and cited no code; the Opus
+panel read the code, found the case that broke a proposed rule, and kept the
+real tensions open.
 
-The invocation can override this two ways, and the more specific one wins:
-
-- `model: sonnet` (or `opus`) — for every panelist. The usual reason is
-  cost on a large panel or a low-stakes topic.
-- `as: UX (sonnet), Architect, Customer (opus)` — for one perspective. A
-  perspective without a model in parentheses takes the panel-wide one. A
-  trailing parenthetical counts as a model only when it names one or plainly
-  means to — `opus`, `sonnet`, `haiku`, `fable`, a `claude-…` ID, a misspelling
-  like `sonet`; `Security (privacy)` is a perspective's name.
-
-Accept only `opus` and `sonnet`. `haiku` is left out on purpose: it summarizes
-well but argues weakly, so a perspective on it gets talked over and the aspect
-map under-weights it. Anything else — `haiku`, a full model ID, a typo — goes back
-to the user at the gate with the two valid values; do not guess the closest one.
-A panelist keeps its model for every round, so a change in its position never
-comes from a model swap.
+A model named in the invocation — panel-wide or for one perspective — is not
+honored; say so once at the gate. `as: Security (privacy)` is a perspective's
+name, not a model. Keep yourself on the session's model; do not set `model` in
+this skill's frontmatter.
 
 ## Output format
 
-Leave out a section with no entries rather than writing "none".
+Leave out a section with no entries rather than writing "none". About 250 words
+in total.
 
 ```markdown
 ## Roundtable: <the question>
 
-<Panel: UX designer (opus), Software architect (opus), Domain expert (opus), Customer (sonnet) · <n> rounds · <converged | stopped on real tensions | hit the round limit>>
+**Verdict:** <your call in one or two sentences, and whether the panel shares it —
+"unanimous", "three of four", "split">.
+**Do now:** <what to change before or with this decision, if anything> (card).
+**Follow-up:** <what comes after, in order> (card each).
+**Don't:** <what a panelist proposed that should not be done, and why in one clause>.
 
-### Where the panel landed
+**Unverified, load-bearing:** <claim the verdict rests on that step 6 could not
+check> — <what breaks if it is false>.
 
-<Two to four sentences: what everyone ended up agreeing on, and how firmly.>
+**Your call**
+1. <A decision only the user can make> — <option A> or <option B>? Mine: <A>, because <reason>.
 
-### Aspect map
+**Open tensions**
+- **<Aspect>** — <Perspective A>: <wants>. <Perspective B>: <wants>. Settles when:
+  <the fact, test, or event that would decide it>.
 
-| Aspect | Owned by | UX | Architect | Domain | Customer | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| Offline conflict resolution | Domain | defers | last-write-wins is enough | must not lose a delivery scan | doesn't care how, must not lose data | resolved: per-field merge |
-| Onboarding friction | UX | wizard, 3 steps max | — | — | wants zero setup | open |
+<Panel: Operator, DBA, Architect, Support (opus) · <n> rounds · <converged | stopped
+on real tensions | stopped on outside facts | hit the round limit>>
+<Exceptions from the run, if any, in one line.>
+Aspect map, position moves, full statements: on request.
+```
+
+Every line under **Verdict** is your recommendation, not the panel's — the
+verdict line says how much of the panel backs it. Every tension needs a
+"Settles when"; a tension that nothing could settle is a value difference, and
+then "Settles when: your call" with an entry under **Your call**.
+
+### On request
+
+**Aspect map** — one row per aspect, open aspects first:
+
+```markdown
+| Aspect | Owned by | Status |
+| :--- | :--- | :--- |
+| Offline conflict resolution | Domain | resolved: per-field merge |
+| Onboarding friction | UX | open: wizard vs zero setup |
+```
 
 "Owned by" is the perspective whose stake in the aspect is highest — the one the
-others deferred to, or should have. One short phrase per cell; "—" where a
+others deferred to, or should have. If the user asks for each perspective's
+stance, add one column per perspective, one short phrase per cell, "—" where a
 perspective did not touch the aspect.
 
-### Live tensions
+**Position moves** — only the moves that changed the outcome:
 
-- **<Perspective A> vs <Perspective B> on <aspect>.** <What each wants, and the
-  trade-off in one sentence.> Would be decided by: <the fact, test, or user
-  decision that would settle it>.
-
-### How positions moved
-
+```markdown
 - **<Perspective>:** <round-1 stance> → <final stance>, after <whose argument>.
-  Or: held throughout.
-
-### My recommendation
-
-<Your call, as the one who saw the whole table, with the reason. Marked as yours,
-not the panel's.>
-
-### Open questions for you
-
-- <Decisions the panel could not make because they need information or authority
-  only the user has.>
-
-### Notes on the run
-
-- <Re-spawned panelists, drifting statements, instruction-like text found.>
 ```
+
+**Statements** — paste the rounds verbatim, round by round.
