@@ -21,6 +21,7 @@ frontmatter, and how workflow skills drive subagents. Read it before adding one.
 | [`verify`](skills/verify/SKILL.md) | Runs the project's own review, build, and test gates, fixes what fails, and reports a per-gate verdict. |
 | [`test-drive`](skills/test-drive/SKILL.md) | Drives the running app through what landed in a time window — or through one named feature — and judges each against its acceptance criteria. |
 | [`roundtable`](skills/roundtable/SKILL.md) | Puts a topic in front of a panel of subagents — UX, architect, domain expert, customer — over rounds in which each answers the others, then maps which aspect belongs to which perspective. |
+| [`write-article`](skills/write-article/SKILL.md) | Interviews you with fixed questions and follow-ups, fixes length and scope in a signed-off briefing, then writes the technical article and measures it against the budget. |
 
 ## Install
 
