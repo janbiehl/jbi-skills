@@ -1,15 +1,15 @@
 ---
 name: write-article
-description: Plans and writes a technical article or post with the user — a fixed interview first (topic, audience, medium, article type, length and scope, key points, sources, tone), then follow-up questions until no gap is left, then a briefing with a per-section length budget the user signs off, and only then the draft, measured against that budget. Use when the user wants a Fachartikel, Fachbeitrag, blog post, tutorial, LinkedIn post, or magazine article written, or says "technische Redaktion", "schreib einen Artikel", or "Beitrag schreiben".
+description: Plans and writes a technical article or post (Fachartikel, blog post, tutorial, LinkedIn post) with the user — a fixed interview first, follow-up questions until no gap is left, then a briefing with a per-section length budget the user signs off, and only then the draft, measured against that budget.
 argument-hint: "[topic | notes file | <slug>.briefing.md to resume]"
 disable-model-invocation: true
 # Interview questions carry examples and reasons the tool cannot render; every
 # question goes in the message text.
 disallowed-tools: AskUserQuestion
 # Writes only the article and its briefing, at the path confirmed in the
-# briefing. The length counter runs through python3, which is not pre-granted:
-# a python3 grant would allow arbitrary code, so it prompts on first use.
-allowed-tools: Read Write Edit Grep Glob
+# briefing. The Bash patterns cover exactly the two commands step 6 runs. The
+# grant clears on the user's first reply, so steps 5–6 prompt; see step 5.
+allowed-tools: Read Write Edit Grep Glob Bash(python3 *count_length.py*) Bash(wc:*)
 ---
 
 # Write a technical article
@@ -41,8 +41,10 @@ reader can tell it from a real one. Never invent a source or a quote, not even
 as a placeholder that looks real.
 
 **Length is a contract.** Agreed in the interview, budgeted per section in the
-briefing, measured after drafting. The tolerance is ±10 % unless the medium sets
-a hard limit; then the limit is the ceiling and the target sits just below it.
+briefing, measured after drafting. The tolerance is ±10 % around the target. If
+the medium sets a hard limit, the briefing records both: the limit as the
+ceiling, and a target about 5 % below it so the tolerance band stays under the
+ceiling. Both numbers go to the measurement in step 6.
 
 **Every follow-up gets an answer before the briefing.** "Weiß ich nicht" is an
 answer too: offer to drop the point or to keep it as `[OFFEN: …]`, and let the
@@ -193,7 +195,7 @@ Post the briefing in this exact form:
 | Kernaussage | <ein Satz> |
 | Zielgruppe | <wer, mit welchem Vorwissen> |
 | Medium · Typ | <Medium> · <Artikeltyp> |
-| Länge | <Zahl> <Wörter / Zeichen inkl. Leerzeichen> (±10 % / harte Grenze) |
+| Länge | <Zahl> <Wörter / Zeichen inkl. Leerzeichen> (±10 %; harte Grenze: <Zahl>, falls das Medium eine setzt) |
 | Umfang | <Abbildungen, Listings, Tabellen, Kasten, Quellen, Teaser …> |
 | Sprache · Ton | <Sprache, Anrede, Perspektive, Ton, Gendern> |
 | Datei | `<Pfad>` |
@@ -230,6 +232,10 @@ what a later session resumes from, and what a revision is checked against.
 Read [references/style-guide.md](references/style-guide.md) before the first
 sentence. Then write the whole article to the file with `Write`.
 
+The `allowed-tools` grant from the frontmatter cleared when the user first
+replied in step 2, so `Write` here and the measurement in step 6 prompt for
+permission. That is expected; do not look for a way around it.
+
 - Follow the Gliederung. Headings are the ones from the briefing — content
   headings, not "Einleitung" and "Hauptteil", unless the medium requires them.
 - Write each section to its budget. A section that runs long is a sign it holds
@@ -255,8 +261,9 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/count_length.py" <article.md> --unit <words
 ```
 
 Add `--include-code` when the briefing counts code listings toward the length;
-by default they are reported separately. Add `--limit` when the length is a hard
-limit, so the check fails above the target instead of above +10 %. The script
+by default they are reported separately. When the briefing has a hard limit, add
+`--limit <Grenze>` next to `--target <Ziel>`: the check then fails above the
+limit regardless of the tolerance. The script
 prints totals, a per-section breakdown, every marker with its line, and an
 `IN TOLERANCE` or `OUT OF TOLERANCE` verdict. If `python3` is missing, fall back
 to `wc -w -m <file>`, and say in the report that the count includes Markdown

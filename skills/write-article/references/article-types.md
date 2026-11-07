@@ -23,7 +23,7 @@ check the current one when the text is close to it.
 
 | Medium | Usual unit | Orientation |
 | :--- | :--- | :--- |
-| LinkedIn or similar post | characters | 150–300 words; stay well under the platform's character limit |
+| LinkedIn or similar post | characters incl. spaces | 1,000–2,000 characters (roughly 150–300 words); stay well under the platform's character limit |
 | Company or personal blog | words | 800–2,000 words |
 | Tutorial on a blog | words | 1,000–3,000 words plus code |
 | Trade magazine (Fachzeitschrift) | characters incl. spaces | per editor's spec; one printed page holds very roughly 3,500–5,000 characters depending on layout and images |

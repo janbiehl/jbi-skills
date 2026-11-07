@@ -8,24 +8,30 @@ not be in the published text. Fenced code blocks are reported separately and
 only counted when --include-code is given.
 
 Usage:
-    count_length.py ARTICLE.md [--unit words|chars] [--target N] [--limit]
+    count_length.py ARTICLE.md [--unit words|chars] [--target N] [--limit N]
                     [--tolerance PCT] [--include-code]
 
+--target N is the agreed length; the draft passes within +/- tolerance of it.
+--limit N is a hard ceiling set by the medium; the draft fails above it, whatever
+the tolerance says. Both may be given (target below the limit); --limit alone
+uses the limit as target with the ceiling at the limit.
+
 Exit status: 0 in tolerance (or no target given), 1 out of tolerance,
-2 the file could not be read.
+2 the file could not be read or an argument is invalid.
 """
 
 import argparse
 import re
 import sys
 
-# Matches the markers the skill writes, in German and English spellings, so a
-# draft in either language is handled the same way.
-MARKER = re.compile(
-    r"\[(PRÜFEN|PRUEFEN|CHECK|OFFEN|OPEN|ABBILDUNG|FIGURE)\b[^\]]*\]",
-    re.IGNORECASE,
-)
-FENCE = re.compile(r"^\s*(```|~~~)")
+# Matches exactly the marker forms SKILL.md step 5 prescribes: the keyword,
+# an optional figure number, then a colon. The colon is required so that
+# ordinary link text such as "[Open Source](...)" is never taken for a marker.
+MARKER = re.compile(r"\[(PRÜFEN|OFFEN|ABBILDUNG(?:\s+\d+)?)\s*:[^\]]*\]")
+# A fence opener: at least three backticks or tildes. The closer must use the
+# same character and at least as many of them (CommonMark), so a ``` line
+# inside a ~~~ block does not close it.
+FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 
 
@@ -38,14 +44,23 @@ def strip_inline(text):
     text = re.sub(r"\[([^\]]*)\]\[[^\]]*\]", r"\1", text)   # reference link
     text = re.sub(r"<https?://[^>]+>", " ", text)           # autolink
     text = re.sub(r"</?[A-Za-z][^>]*>", " ", text)          # inline HTML tags
-    text = re.sub(r"`([^`]*)`", r"\1", text)                # inline code
+    # Inline code is kept verbatim: nothing inside it is Markdown syntax.
+    code_spans = []
+    def _keep(match):
+        code_spans.append(match.group(1))
+        return f"\x00{len(code_spans) - 1}\x00"
+    text = re.sub(r"`([^`]*)`", _keep, text)
     text = re.sub(r"^\s{0,3}#{1,6}\s+", "", text)           # heading marks
     text = re.sub(r"^\s*>+\s?", "", text)                   # blockquote
     text = re.sub(r"^\s*([-*+]|\d+[.)])\s+", "", text)      # list markers
     text = re.sub(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$", "", text)  # table rule
     text = text.replace("|", " ")
-    text = re.sub(r"(\*\*|__|\*|_|~~)", "", text)           # emphasis
     text = re.sub(r"^\s*([-*_]\s*){3,}$", "", text)         # horizontal rule
+    # Emphasis only when paired, so "snake_case" and "2*3*4" keep their characters.
+    text = re.sub(r"(\*\*|__|~~)(.+?)\1", r"\2", text)
+    text = re.sub(r"(?<!\w)\*(\S.*?\S|\S)\*(?!\w)", r"\1", text)
+    text = re.sub(r"(?<!\w)_(\S.*?\S|\S)_(?!\w)", r"\1", text)
+    text = re.sub(r"\x00(\d+)\x00", lambda m: code_spans[int(m.group(1))], text)
     return text
 
 
@@ -72,21 +87,34 @@ class Section:
 def parse(lines):
     sections = [Section("(vor der ersten Überschrift)")]
     markers = []
-    in_code = False
+    fence = None          # the opening fence string while inside a code block
     in_comment = False
 
     start = 0
-    if lines and lines[0].strip() == "---":                 # YAML front matter
-        for i in range(1, len(lines)):
+    # YAML front matter: a "---" first line, closed within the first 50 lines,
+    # with every non-empty line in between shaped like YAML ("key: value",
+    # "- item", or an indented continuation). A "---" that opens an article as
+    # a horizontal rule does not meet that shape and is left alone.
+    FRONT_MATTER_MAX_LINES = 50
+    if lines and lines[0].strip() == "---":
+        for i in range(1, min(len(lines), FRONT_MATTER_MAX_LINES)):
             if lines[i].strip() in ("---", "..."):
                 start = i + 1
                 break
+            if lines[i].strip() and not re.match(r"^(\s+\S|[\w-]+\s*:|-\s)", lines[i]):
+                break
 
     for number, line in enumerate(lines[start:], start=start + 1):
-        if FENCE.match(line):
-            in_code = not in_code
+        opener = FENCE.match(line)
+        if fence is None and opener:
+            fence = opener.group(1)
             continue
-        if in_code:
+        if fence is not None:
+            closer = opener.group(1) if opener else ""
+            if closer[:1] == fence[:1] and len(closer) >= len(fence) \
+                    and not line.strip(" ").rstrip("`~").strip():
+                fence = None
+                continue
             sections[-1].code_lines += 1
             sections[-1].code_text.append(line)
             continue
@@ -119,15 +147,30 @@ def measure(section, unit, include_code):
     return len(words_of(text)) if unit == "words" else chars_of(text)
 
 
+def positive_int(value):
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError(f"must be a positive number, got {value}")
+    return number
+
+
+def non_negative_float(value):
+    number = float(value)
+    if number < 0:
+        raise argparse.ArgumentTypeError(f"must not be negative, got {value}")
+    return number
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("article")
     parser.add_argument("--unit", choices=["words", "chars"], default="words")
-    parser.add_argument("--target", type=int)
-    parser.add_argument("--tolerance", type=float, default=10.0,
+    parser.add_argument("--target", type=positive_int,
+                        help="target length in the chosen unit (must be > 0)")
+    parser.add_argument("--tolerance", type=non_negative_float, default=10.0,
                         help="allowed deviation in percent (default 10)")
-    parser.add_argument("--limit", action="store_true",
-                        help="target is a hard ceiling: fail above it, allow tolerance below")
+    parser.add_argument("--limit", type=positive_int,
+                        help="hard ceiling in the chosen unit: fail above it regardless of tolerance")
     parser.add_argument("--include-code", action="store_true",
                         help="count fenced code toward the length")
     args = parser.parse_args()
@@ -171,16 +214,23 @@ def main():
     else:
         print("Markierungen: keine")
 
-    if args.target is None:
+    if args.target is None and args.limit is None:
         return 0
 
-    low = args.target * (1 - args.tolerance / 100)
-    high = args.target if args.limit else args.target * (1 + args.tolerance / 100)
-    deviation = (total - args.target) / args.target * 100
+    target = args.target if args.target is not None else args.limit
+    if args.limit is not None and target > args.limit:
+        print(f"--target {target} liegt über --limit {args.limit}", file=sys.stderr)
+        return 2
+
+    low = target * (1 - args.tolerance / 100)
+    high = target * (1 + args.tolerance / 100)
+    if args.limit is not None:
+        high = min(high, args.limit)
+    deviation = (total - target) / target * 100
     verdict = "IN TOLERANCE" if low <= total <= high else "OUT OF TOLERANCE"
     print()
-    print(f"Ziel: {args.target} {unit_label} "
-          f"(erlaubt {round(low)}–{round(high)}{', harte Grenze' if args.limit else ''})")
+    limit_note = f", harte Grenze {args.limit}" if args.limit is not None else ""
+    print(f"Ziel: {target} {unit_label} (erlaubt {round(low)}–{round(high)}{limit_note})")
     print(f"Ist: {total} ({deviation:+.1f} %) → {verdict}")
     return 0 if verdict == "IN TOLERANCE" else 1
 
