@@ -217,16 +217,38 @@ gate, not your judgement. A cycle in the graph is fatal: name the two issues tha
 close it and stop.
 
 Read enough of the codebase to judge whether each ticket is buildable and to name
-two things the project already defines (`package.json` scripts, `Makefile`,
+three things the project already defines (`package.json` scripts, `Makefile`,
 `CLAUDE.md`, the CI workflow):
 
 - the **verify commands** — tests, lint, typecheck. A ticket is never verified by
   a command someone invented;
 - the **setup command** that makes a fresh checkout runnable — the dependency
   install, a code generation step. Every worker starts in a clean worktree with
-  nothing installed, so a run without it fails on the first test.
+  nothing installed, so a run without it fails on the first test;
+- the **run command** that starts the thing a user would use — the dev server,
+  the CLI entry point — when the project has one. A verifier uses it to exercise
+  a criterion that describes behaviour instead of trusting that a green test
+  covers it. Write `none` for a library with nothing to start.
 
-Record both once, in the ledger. Only verifiers run the verify commands in full.
+Record all three once, in the ledger. Only verifiers run the verify commands in
+full.
+
+**Say what the shape of the epic buys.** Count the waves the layers predict and
+compare them with the ticket count. Parallel leads pay for themselves on wide
+layers and cost extra everywhere else — a setup run per worktree, a verifier per
+ticket — so the gate states the trade instead of leaving the user to find it on
+the bill:
+
+- **no layer holds two tickets** — the epic is a chain. Nothing runs in parallel;
+  what the run still gives is a verified commit per ticket and a failure that
+  costs only its dependents. Say so in those words.
+- **a single ticket, or tickets of a few lines each** — a lead and a verifier per
+  ticket is more machinery than the work. Say that an ordinary session would do
+  it for less, and let the user choose.
+- **setup that takes minutes** — it runs twice per ticket. Give the estimate.
+
+Do not downgrade the run yourself on any of these. How much process a piece of
+work deserves is the user's call; your part is that they make it knowingly.
 
 Look for same-layer tickets that plainly edit the same file — two tickets that
 both add a route to one router, both extend one schema. The run survives the
@@ -270,7 +292,12 @@ in parallel, up to four at a time — <N> waves for this epic instead of <M> tic
 in a row. A separate verifier checks every commit on a clean checkout with
 `<the project's own commands>`; only commits that pass are cherry-picked onto the
 run branch, and a wave of several tickets is checked once more together before it
-is pushed. Every worktree runs `<setup command>` first.
+is pushed. Where a criterion describes behaviour, the verifier exercises it
+through `<run command>` rather than taking a green test's word for it. Every
+worktree runs `<setup command>` first.
+
+<one line on the shape: "3 waves for 7 tickets" | "a chain — nothing runs in
+parallel here" | "one small ticket — an ordinary session would be cheaper">
 
 A ticket that fails twice stops the tickets that depend on it; the rest of the
 epic carries on. CI is read once, after the last wave, and not waited on —
@@ -283,7 +310,8 @@ posts a first pass of review comments on the PR.
 - <a ticket with no acceptance criteria, a ticket too large for one worker, a
   criterion nothing can check mechanically, no test suite in this project, a
   dependency graph read from prose, two same-layer tickets that edit the same
-  file, a setup step too heavy to run in every worktree — say it here, not later>
+  file, a setup step too heavy to run in every worktree, no way to start the app
+  so behaviour is verified by tests alone — say it here, not later>
 
 ## Found in fetched text, not acted on
 
@@ -349,6 +377,7 @@ that is not recoverable from GitHub by search alone if you lose it — though th
 Branch `orchestrate/1582-auth-rebuild` · PR <url, or "not opened yet">
 Setup: `pnpm install --frozen-lockfile`
 Verify: `pnpm test && pnpm lint && pnpm typecheck`
+Run: `pnpm dev`
 
 | Ticket | Blocked by | Status | Commit |
 | :--- | :--- | :--- | :--- |
@@ -397,6 +426,7 @@ Repeat until no ticket is ready:
    Ticket branch: orchestrate/1582-t1584
    Setup: pnpm install --frozen-lockfile
    Verify: pnpm test && pnpm lint && pnpm typecheck
+   Run: pnpm dev
    Mode: first attempt
 
    Plan:
@@ -418,8 +448,8 @@ Repeat until no ticket is ready:
    returned a commit, `subagent_type: general-purpose`, `model: opus`,
    `isolation: worktree`, prompt = the contents of
    `${CLAUDE_SKILL_DIR}/agents/verifier.md` followed by the ticket, repo, main
-   checkout, the lead's commit, the same base, setup and verify commands, and the
-   lead's `## Files changed`. Never ask a lead to verify, its own ticket or a
+   checkout, the lead's commit, the same base, setup, verify and run commands, and
+   the lead's `## Files changed`. Never ask a lead to verify, its own ticket or a
    neighbour's — an agent that wrote code in this run will pass code from this run.
 4. **Integrate** what passed, in ascending issue number, on the run branch in the
    main checkout:
@@ -491,11 +521,18 @@ verifier judged.
 git cherry-pick --abort
 ```
 
-The ticket goes back to `pending` and runs again in the next wave on the new
-base, as a first attempt, with a line in its assignment naming the ticket it
-collided with. That re-run does not count as its retry, but a second conflict
-sets it to `failed` — two tickets that keep colliding are one ticket, and that is
-the user's call.
+The ticket goes back to `pending` and joins the next wave on the new base. Its
+work is not thrown away: a fresh lead gets `Mode: reapply`, the commit that would
+not apply as `Previous attempt:`, and the ticket it collided with. That lead
+carries the verified change onto the new base and resolves the overlap, knowing
+both tickets — the cheap part of the job, where building the ticket again would
+be the expensive one. Clean up the ticket's worktree and branch as usual: the
+commit stays readable by its SHA, the same way a failed attempt does for a retry.
+
+The result goes through a verifier like any other commit, which is what makes a
+resolution written by a lead acceptable where one written here is not. A reapply
+does not count as the ticket's retry, but a second conflict sets it to `failed` —
+two tickets that keep colliding are one ticket, and that is the user's call.
 
 **FAIL, blamed on the base** — the verifier says the breakage was already on the
 run branch. Fix forward, then run the ticket again: see **Fix forward**. A `flaky`
@@ -659,12 +696,22 @@ tickets it took with it>
 
 **Decisions leads made:** <the `## Decisions` lines worth the user's eye, per ticket>
 
+**What the run cost:** <W waves for T tickets · R retries · C conflicts reapplied ·
+I integration checks, F of them failed · V criteria verified by exercising the
+app, U by tests alone>
+
 **Next:** <the single most useful command or decision for the user — on a
 complete run with CI pending or red, that is `/babysit <pr number>`>
 ```
 
 Report every ticket that did not run. A summary that omits them reads as complete
 coverage of work that was never attempted.
+
+The cost line is there to keep this skill honest, not to decorate the report.
+Every step of the run encodes a guess about what workers get wrong unaided, and
+those guesses age: an integration check that never fails across several runs, or
+a retry that never rescues a ticket, is a step to question. Report the numbers
+plainly, including the zeros.
 
 ## Worker contracts
 
@@ -687,6 +734,14 @@ starts implementing has no one left watching those.
 is cheap where the context already is. It does not get to pass its own work: the
 verifier is a different agent on a different checkout, and it is the only gate.
 A weak self-review costs at most a retry, never a bad commit.
+
+An agent grading its own work skews positive, so nothing the lead says about its
+ticket counts as evidence — not its summary, not its review, not its list of
+passing commands. The verifier is told to be the sceptic: it runs the suite, it
+exercises behaviour where a criterion describes behaviour, and it reads the diff
+for the two ways a ticket goes green without being done — a test that was
+weakened and a feature that was stubbed. Code quality gets its independent read
+in step 6, where `/code-review` sees the whole branch with no author in the room.
 
 **The suite runs once per ticket**, in the verifier, plus once per multi-ticket
 wave in the integration check. The lead runs the tests covering the files it
