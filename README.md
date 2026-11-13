@@ -16,6 +16,7 @@ frontmatter, and how workflow skills drive subagents. Read it before adding one.
 | [`brainstorm`](skills/brainstorm/SKILL.md) | Interviews you one question at a time until both sides hold the same picture, then writes up the decisions. |
 | [`to-tickets`](skills/to-tickets/SKILL.md) | Breaks a plan into a graph of thin vertical-slice tickets with explicit blocking edges. |
 | [`orchestrate`](skills/orchestrate/SKILL.md) | Drives a GitHub epic to a draft PR: a ticket lead per sub-issue in its own worktree, independent tickets in parallel, every commit verified before it is integrated. |
+| [`steer`](skills/steer/SKILL.md) | Steers several worker sessions and their PRs from one conversation — briefs them, verifies their reports, arranges an independent review per PR, watches integration, and brings every merge to you. |
 | [`handoff`](skills/handoff/SKILL.md) | Writes down where the work stands so the next person, session, or agent can pick it up — and reads one back with `--resume`. |
 | [`babysit`](skills/babysit/SKILL.md) | Works a GitHub pull request toward mergeable in rounds — rebase, fix and answer the review comments, fix red CI, post a fresh review — and merges it with `--merge`. |
 | [`verify`](skills/verify/SKILL.md) | Runs the project's own review, build, and test gates, fixes what fails, and reports a per-gate verdict. |
