@@ -108,7 +108,13 @@ cannot find it; a session that cannot address you cannot reach anyone.
 > it reads your turns regularly. The user's answers come back from the
 > steering session with the user's words quoted. An answer the steering
 > session gives on its own is marked as its own and is not the user's
-> approval. Your reports go to the steering session as well. The same
+> approval. Your reports go to the steering session as well. Send few
+> messages and make each one accurate: every message wakes the steering
+> session and costs usage on both sides. Do not send progress notes,
+> acknowledgements or partial findings. Collect what belongs together,
+> check it, and send one message that is complete and that you will not
+> have to correct; a question that blocks you is the exception and goes at
+> once, together with everything else you have open. The same
 > channel reaches the other sessions: when you need something from one of
 > them (a fact about its code, a change on its branch, agreement on a shared
 > interface), ask the steering session, which carries the question over and
@@ -127,6 +133,28 @@ On your side:
   user, however clear the answer looks to you.
 - A session that asked the user directly, or sits in a question dialog, has
   broken the rule. Tell it to withdraw the question and send it to you.
+
+### Few messages, each one accurate
+
+Every message you send wakes a session, and every one sent to you wakes
+you; both cost usage. The same holds for you as for the sessions you steer.
+
+- **One complete message instead of several small ones.** Before you
+  message a session, collect everything you have for it: all findings of a
+  review, every answer it is waiting for, the changes on main that affect
+  it. Send that as one message. Do not send a second message to add what
+  the first forgot.
+- **Check before you send.** A message you have to correct costs three: the
+  wrong one, the correction, and the work the session did in between.
+  Verify the cheap parts first, as "Reports are not proof" says.
+- **Nothing that carries no action.** No acknowledgements, no "thanks", no
+  "still waiting", no status a session did not ask for.
+- **Urgent beats batched.** What stops a session from doing wrong work goes
+  right away: a decision that changes its task, a merged change it is about
+  to collide with, a trap it is about to hit. Put whatever else is pending
+  for that session into the same message.
+- **A session that sends many small messages** is told once to collect them,
+  with the channel block's sentence quoted.
 
 ### Between sessions
 
