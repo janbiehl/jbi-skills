@@ -1,6 +1,6 @@
 ---
 name: steer
-description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, and drives each PR to green, reviewed and ready to merge without being asked, so the user is left with the merge decision. Sessions reach the user and each other only through the steering session, which carries questions and answers between them. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events) and a way to schedule a wake-up.'
+description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, drives each PR to green, reviewed and ready to merge without being asked, so the user is left with the merge decision, and queues urgent follow-up work as task cards while offering an issue for the rest. Sessions reach the user and each other only through the steering session, which carries questions and answers between them. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events, and spawn_task for task cards) and a way to schedule a wake-up.'
 argument-hint: "[sessions, PRs or plan to steer]"
 # Merges, messages to other sessions and cleanup are side effects; the user decides when steering starts.
 disable-model-invocation: true
@@ -294,6 +294,43 @@ the base's commits are not ancestors of main any more. Land it like this:
 4. Push, then merge pinned to the new head. If you merge before CI ran on
    that commit, tell the user so before the merge, not after.
 
+## Follow-up work
+
+Work turns up that no running session was asked to do: a reviewer's finding
+outside the PR's scope, a gap a session reports, something you notice in a
+diff or on the integration watch. First sort it. A fix that belongs to an
+open PR goes to that PR's author and is not a follow-up. Everything else is
+one of two kinds, and you say which when you raise it.
+
+- **Do now** means it should start today: main is red or wrong without it, a
+  PR in flight depends on it, or it is small and the context for it exists
+  only now. Queue it as a task card without asking. In the Claude desktop
+  app that is the task-suggestion tool (`spawn_task`), which shows the user
+  a "Suggested task" card they start with one click. Queue one card per
+  change, as soon as you see the work, and tell the user in one line what
+  you queued and why it cannot wait.
+- **Later** means it should be tracked and is not urgent: a cleanup, a
+  missing test for code nobody is touching, an improvement, a bug that is
+  not biting today. Do not queue a card and do not start a session. Ask the
+  user whether to open an issue in the project's issue tracker, one question
+  with the title you would give it and a sentence on why it matters. On a
+  yes, write the issue and tell them where it is. On a no, drop it, or note
+  it where the user says. Several later items found together go into one
+  question as a short list, each answered yes or no.
+
+When you cannot tell which kind it is, treat it as later and ask.
+
+A card's session starts fresh, so its prompt is a full brief as in "Briefing
+a session": goal, background, repository-relative files, constraints, traps,
+what done means, and the channel block with your session ID. Give it a short
+imperative title under 60 characters and one or two plain sentences on what
+it does and why. Once the user starts a card, that session is one you steer,
+and its PR goes through "The life of a pull request" like any other. A card
+that went stale (fixed elsewhere, or no longer true) you withdraw.
+
+If the session has no task-suggestion tool, name the do-now work to the user
+with the brief ready, and ask whether to start a session for it.
+
 ## Decisions and design
 
 - **Interview when a choice changes what gets built** and the codebase does not
@@ -314,8 +351,9 @@ the base's commits are not ancestors of main any more. Land it like this:
 - **When the design is settled**, offer to break it into tickets with blocking
   edges (an installed `to-tickets` skill does this). Then start the unblocked
   ticket first; nothing blocks it, and the others wait on it.
-- **Issues:** draft inline when asked. Publishing needs the user's yes, and
-  "do not publish yet" holds until it is lifted.
+- **Issues:** draft inline when asked, and offer one for later work as
+  "Follow-up work" says. Publishing needs the user's yes, and "do not
+  publish yet" holds until it is lifted.
 
 ## Waiting and wake-ups
 
@@ -393,6 +431,7 @@ the base's commits are not ancestors of main any more. Land it like this:
 - which session gets which task;
 - briefs;
 - routing findings and failed checks;
+- queuing a task card for follow-up work that should start now;
 - carrying questions and answers between sessions;
 - technical forks nobody outside the code will notice;
 - having main brought into a branch, and one re-run of a flaky check;
