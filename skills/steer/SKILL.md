@@ -1,8 +1,9 @@
 ---
 name: steer
-description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, and brings every merge decision to the user. Sessions run as dedicated threads at low effort, reach the user only through the steering session, and get a check-in about every 15 minutes. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events).'
+description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, and brings every merge decision to the user. Sessions run as dedicated threads (workers at low effort, reviewers at normal effort), reach the user only through the steering session, and get a check-in about every 15 minutes. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events).'
 argument-hint: "[sessions, PRs or plan to steer]"
 disable-model-invocation: true
+disallowed-tools: AskUserQuestion
 # Merges, messages to other sessions and cleanup are side effects; the user decides when steering starts.
 ---
 
@@ -56,9 +57,12 @@ the next step; the steering works without them.
   worker and every reviewer as its own thread, a session the user can see and
   open in the sidebar, and not as an in-process subagent hidden inside this
   conversation. One thread has one task.
-- **Low effort.** Start every session at low effort. The brief carries the
-  thinking, and parallel sessions share one usage limit. Raise the effort for
-  a session only when the user says so.
+- **Low effort for workers.** Start every worker session at low effort. The
+  brief carries the thinking, and parallel sessions share one usage limit.
+  Raise the effort for a worker only when the user says so.
+- **Normal effort for reviewers.** Start a review session at the default
+  effort, with no override. The review is the step that catches what the
+  worker missed, so it does not run on less.
 - **The model** is the one the user wants for workers (check memory).
 - **You are the only channel to the user.** A session never asks the user
   anything itself. Put the rule from "The channel to the user" into every
@@ -67,10 +71,13 @@ the next step; the steering works without them.
 ### The channel to the user
 
 All communication between a session and the user runs through you, in both
-directions. Every brief carries this block:
+directions. Every brief carries this block, with your own session ID filled
+in. Look the ID up before the first brief; a session that cannot address you
+cannot reach anyone.
 
 > You were started by a steering session, and it is your only channel to the
-> user. Do not ask the user anything yourself: never call the question tool
+> user. Its session ID is `<steering session ID>`; reach it with your
+> session-message tool (`SendMessage`). Do not ask the user anything yourself: never call the question tool
 > (`AskUserQuestion`), and do not end a turn with a question addressed to the
 > user. When you need a decision, an approval or a missing fact, send it to
 > the steering session as a message: the question, the options you see, your
@@ -110,7 +117,8 @@ The parts of a brief that worked:
    its turn. Ask for the report in a fixed shape: what was verified, and what
    was not.
 7. **"Draft PR. Do not merge. Do not mark ready unless told."**
-8. **The channel block** from "The channel to the user", unchanged.
+8. **The channel block** from "The channel to the user", with your session
+   ID filled in and nothing else changed.
 
 Pass the user's decisions on in the user's own words, quoted, and include the
 question they answered: *I asked "…?" and the answer, verbatim, was "…".* A
@@ -126,7 +134,7 @@ main, naming the commit that must be included.
 1. **Draft.** The author opens it as a draft and runs its own checks.
 2. **Independent review.** This applies to every code PR, not only the risky
    ones. Use a dedicated session that did not write the code, on a fresh
-   context, read-only: no edits, no pushes, no PR comments. Brief it with
+   context, at normal effort, read-only: no edits, no pushes, no PR comments. Brief it with
    the specification, what the PR was asked to do, the areas to look at
    hardest, and the words "the author's claims are unverified". When disk is
    short, it can share the main checkout if told not to build, switch branches
