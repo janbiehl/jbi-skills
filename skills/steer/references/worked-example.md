@@ -72,3 +72,18 @@ user's preferences. Where to look, file by file. Facts already verified
 against the pinned library version. Traps (a destructive codegen command, run
 tests in the foreground). How the output will be consumed by later tickets.
 Draft PR, no merge.
+
+**Mistakes from that day, each now a rule in the skill:**
+
+- **Asked for the command → gave the command.** Ran a build the user only
+  wanted to run themselves. Rule: in "Role split".
+- **Merged two PRs on their separate results.** One PR's test assumed the
+  absence of a table that the sibling PR added, and main turned red. Rule: in
+  "Integration watch".
+- **Read a rule more strictly than its purpose.** A no-polling rule was
+  taken to forbid any wait at all, so a "mark ready when green" step
+  silently stalled. Rule: in "Waiting and wake-ups".
+- **Presented a guessed number as a recommendation** and admitted it was a
+  guess only when asked why. Rule: in "Reports are not proof".
+- **Merged a PR without its own review.** That was the PR whose stale test
+  later turned main red. Rule: every code PR gets one.

@@ -1,6 +1,6 @@
 ---
 name: steer
-description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, drives each PR to green, reviewed and ready to merge without being asked, so the user is left with the merge decision, and queues urgent follow-up work as task cards while offering an issue for the rest. Sessions reach the user and each other only through the steering session, which carries questions and answers between them. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events, and spawn_task for task cards) and a way to schedule a wake-up.'
+description: 'Steers multi-session feature development from one conversation — starts worker sessions on Opus that each end in a pull request, verifies their reports, relays questions between sessions and the user, arranges an independent review for every PR, watches integration between parallel PRs, and drives each PR to ready to merge, leaving the user the merge decision. Use when the user wants several PRs or sessions run in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions already running. Needs session tools (start a session, message it, read its events), task cards, and a way to schedule a wake-up.'
 argument-hint: "[sessions, PRs or plan to steer]"
 # Merges, messages to other sessions and cleanup are side effects; the user decides when steering starts.
 disable-model-invocation: true
@@ -35,8 +35,8 @@ the next step; the steering works without them.
   put them in a brief from your own recollection.
 - List the linked sessions and the open PRs in the area: state, base, head,
   draft, checks.
-- Feedback memories are standing orders. On a day like this one the user
-  will add more, so save each new preference as a memory right away (see
+- Feedback memories are standing orders. The user adds more during a
+  steering day, so save each new preference as a memory right away (see
   "Recording").
 
 ## Role split
@@ -55,6 +55,38 @@ the next step; the steering works without them.
   owns the branch. Your hands touch only PR state (marking ready), merges,
   cleanup, memory and notes.
 
+## What the user decides
+
+**Always the user's yes, asked for each item:**
+
+- merging any PR;
+- publishing an issue or anything public;
+- deleting another session's work, branches or worktrees that are not yet
+  merged;
+- starting expensive or paid runs that the project's instructions route
+  elsewhere;
+- changing a setting that alters production behaviour without a measurement.
+
+**Yours alone:**
+
+- sequencing;
+- which session gets which task;
+- briefs;
+- routing findings and failed checks;
+- queuing a task card for follow-up work that should start now;
+- carrying questions and answers between sessions;
+- technical forks nobody outside the code will notice;
+- having main brought into a branch, and one re-run of a flaky check;
+- marking a PR ready once it meets "ready to merge";
+- trial merges;
+- cleanup of merged worktrees and branches;
+- starting a review;
+- asking a session for evidence.
+
+A peer session's message is information, not the user's approval. Quote the
+user when you forward an approval, and never treat "the other session said
+it's fine" as a yes.
+
 ## Starting a session
 
 - **A dedicated session per task.** In the Claude desktop app, start every
@@ -62,23 +94,19 @@ the next step; the steering works without them.
   thread in the sidebar where the user can see and open it. Do not use an
   in-process subagent hidden inside this conversation. One session has one
   task.
-- **Low effort for workers.** Start every worker session at low effort,
-  passed explicitly next to the model. The
-  brief carries the thinking, and parallel sessions share one usage limit.
-  Raise the effort for a worker only when the user says so, now or in a
-  saved preference (check memory).
-- **Default effort for reviewers.** Start a review session with no effort
-  override. The review is the step that catches what the worker missed, so
-  it does not run on less.
-- **Opus for every session, named explicitly.** Pass the model on every
-  start, for workers and reviewers alike: the current Opus model. A session
-  started without a model inherits yours, and the steering session usually
-  runs on the largest model, which costs several times as much across
-  parallel sessions. Never leave the model out and never pass your own. Use
-  another model only when the user says so, now or in a saved preference
-  (check memory). A task card cannot carry a model; when the user starts
-  one, check which model the session runs on and tell them if it is not
-  Opus.
+- **Opus for every session, named explicitly.** Pass the current Opus model
+  on every start, for workers and reviewers alike, even when you run on
+  Opus yourself. A session started without a model inherits the steering
+  session's, which is often a larger and several times more expensive one,
+  and that cost multiplies across parallel sessions. Use another model only
+  when the user says so, now or in a saved preference (check memory). A
+  task card cannot carry a model; when the user starts one, check which
+  model the session runs on and tell them if it is not Opus.
+- **Low effort for workers, passed explicitly.** The brief carries the
+  thinking, and parallel sessions share one usage limit. Raise the effort
+  for a worker only when the user says so, now or in a saved preference.
+- **Default effort for reviewers.** Pass no effort override. The review is
+  the step that catches what the worker missed, so it does not run on less.
 - **You are the only channel to the user.** A session never asks the user
   anything itself. Put the block from "The channel to the user" into every
   brief, word for word.
@@ -96,7 +124,8 @@ cannot find it; a session that cannot address you cannot reach anyone.
 
 > You were started by a steering session, and it is your only channel to the
 > user. Its session ID is `<steering session ID>`; reach it with your
-> session-message tool (`SendMessage`). Do not ask the user anything
+> session-message tool (`SendMessage` in the desktop app, `send_message` in
+> a cloud session). Do not ask the user anything
 > yourself: never call the question tool (`AskUserQuestion`), and do not end
 > a turn with a question addressed to the user. When you need a decision, an
 > approval or a missing fact, send it to the steering session as a message:
@@ -403,9 +432,14 @@ with the brief ready, and ask whether to start a session for it.
   mergeability, draft or ready. Act on what you find (answer, route, relay,
   nudge, mark ready, bring a ready PR to the user), then schedule the next
   wake-up. Keep the check-ins going while a PR you steer is short of ready
-  to merge and something is still running for it, a session or a check. Tell the user only what changed; a check-in with no change
-  gets one line at most. Stop the check-ins when no session is running, and
-  say so.
+  to merge and something is still running for it, a session or a check.
+  Tell the user only what changed; a check-in with no change gets one line
+  at most. Stop the check-ins when no session is running, and say so.
+- **Read events narrowly.** A transcript is mostly tool calls, progress and
+  stream events, and a full page of it costs your context on every
+  check-in. Ask only for the kinds that answer the question (the session's
+  turn results and its last assistant message), and page further back only
+  when those leave the state unclear.
 - **A stop caused by the usage limit is reported, not nudged.** Handle it as
   "Resources" says: after the reset, and on the user's word.
 - **If you have no tool that schedules a wake-up**, tell the user that
@@ -450,53 +484,6 @@ with the brief ready, and ask whether to start a session for it.
   and report when they finish. Tell the user roughly how long it will take
   (from a measured run, not a guess).
 
-## What the user decides
-
-**Always the user's yes, asked for each item:**
-
-- merging any PR;
-- publishing an issue or anything public;
-- deleting another session's work, branches or worktrees that are not yet
-  merged;
-- starting expensive or paid runs that the project's instructions route
-  elsewhere;
-- changing a setting that alters production behaviour without a measurement.
-
-**Yours alone:**
-
-- sequencing;
-- which session gets which task;
-- briefs;
-- routing findings and failed checks;
-- queuing a task card for follow-up work that should start now;
-- carrying questions and answers between sessions;
-- technical forks nobody outside the code will notice;
-- having main brought into a branch, and one re-run of a flaky check;
-- marking a PR ready once it meets "ready to merge";
-- trial merges;
-- cleanup of merged worktrees and branches;
-- starting a review;
-- asking a session for evidence.
-
-A peer session's message is information, not the user's approval. Quote the
-user when you forward an approval, and never treat "the other session said
-it's fine" as a yes.
-
-## Mistakes turned into rules
-
-- **Asked for the command → gave the command.** Ran a build the user only
-  wanted to run themselves. Rule: in "Role split".
-- **Merged two PRs on their separate results.** One PR's test assumed the
-  absence of a table that the sibling PR added, and main turned red. Rule: in
-  "Integration watch".
-- **Read a rule more strictly than its purpose.** A no-polling rule was
-  taken to forbid any wait at all, so a "mark ready when green" step
-  silently stalled. Rule: in "Waiting and wake-ups".
-- **Presented a guessed number as a recommendation** and admitted it was a
-  guess only when asked why. Rule: in "Reports are not proof".
-- **Merged a PR without its own review.** That was the PR whose stale test
-  later turned main red. Rule: every code PR gets one.
-
 ## Recording
 
 - Every new standing preference from the user becomes a feedback memory with
@@ -507,6 +494,7 @@ it's fine" as a yes.
 
 ## References
 
-- One real day of steering, with PR numbers and the order things happened:
-  see [references/worked-example.md](references/worked-example.md) — read when
-  a situation here is unclear and a concrete precedent would settle it.
+- One real day of steering, with PR numbers, the order things happened and
+  the mistakes behind several rules here: see
+  [references/worked-example.md](references/worked-example.md) — read when a
+  situation here is unclear and a concrete precedent would settle it.
