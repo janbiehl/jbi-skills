@@ -1,10 +1,11 @@
 ---
 name: steer
-description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, and brings every merge decision to the user. Sessions run as dedicated threads (workers at low effort, reviewers at normal effort), reach the user only through the steering session, and get a check-in about every 15 minutes. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events).'
+description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, and brings every merge decision to the user. Sessions reach the user only through the steering session. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events) and a way to schedule a wake-up.'
 argument-hint: "[sessions, PRs or plan to steer]"
-disable-model-invocation: true
-disallowed-tools: AskUserQuestion
 # Merges, messages to other sessions and cleanup are side effects; the user decides when steering starts.
+disable-model-invocation: true
+# Questions go in prose, one per message (see "Decisions and design"); the steering session holds no dialog open.
+disallowed-tools: AskUserQuestion
 ---
 
 # Steer feature development
@@ -53,38 +54,49 @@ the next step; the steering works without them.
 
 ## Starting a session
 
-- **A dedicated thread per session.** In the Claude desktop app, start every
-  worker and every reviewer as its own thread, a session the user can see and
-  open in the sidebar, and not as an in-process subagent hidden inside this
-  conversation. One thread has one task.
+- **A dedicated session per task.** In the Claude desktop app, start every
+  worker and every reviewer as its own session, which the app shows as a
+  thread in the sidebar where the user can see and open it. Do not use an
+  in-process subagent hidden inside this conversation. One session has one
+  task.
 - **Low effort for workers.** Start every worker session at low effort. The
   brief carries the thinking, and parallel sessions share one usage limit.
-  Raise the effort for a worker only when the user says so.
-- **Normal effort for reviewers.** Start a review session at the default
-  effort, with no override. The review is the step that catches what the
-  worker missed, so it does not run on less.
+  Raise the effort for a worker only when the user says so, now or in a
+  saved preference (check memory).
+- **Default effort for reviewers.** Start a review session with no effort
+  override. The review is the step that catches what the worker missed, so
+  it does not run on less.
 - **The model** is the one the user wants for workers (check memory).
 - **You are the only channel to the user.** A session never asks the user
-  anything itself. Put the rule from "The channel to the user" into every
+  anything itself. Put the block from "The channel to the user" into every
   brief, word for word.
+- **Sessions you take over get the block too.** A session the user hands
+  over never had a brief from you. Before anything else, send it the block
+  with your session ID, reworded only in its first clause ("You are now
+  steered by a steering session").
 
 ### The channel to the user
 
 All communication between a session and the user runs through you, in both
 directions. Every brief carries this block, with your own session ID filled
-in. Look the ID up before the first brief; a session that cannot address you
-cannot reach anyone.
+in. Look the ID up before the first brief, and ask the user for it if you
+cannot find it; a session that cannot address you cannot reach anyone.
 
 > You were started by a steering session, and it is your only channel to the
 > user. Its session ID is `<steering session ID>`; reach it with your
-> session-message tool (`SendMessage`). Do not ask the user anything yourself: never call the question tool
-> (`AskUserQuestion`), and do not end a turn with a question addressed to the
-> user. When you need a decision, an approval or a missing fact, send it to
-> the steering session as a message: the question, the options you see, your
-> recommendation, and what is blocked until it is answered. Then carry on
-> with everything that does not depend on the answer; if nothing is left,
-> end your turn and wait. Answers come back from the steering session with
-> the user's words quoted. Your reports go to the steering session as well.
+> session-message tool (`SendMessage`). Do not ask the user anything
+> yourself: never call the question tool (`AskUserQuestion`), and do not end
+> a turn with a question addressed to the user. When you need a decision, an
+> approval or a missing fact, send it to the steering session as a message:
+> the question, the options you see, your recommendation, and what is
+> blocked until it is answered. Then carry on with everything that does not
+> depend on the answer; if nothing is left, end your turn and wait. If you
+> have no tool that reaches that session ID, write the question as the last
+> thing in your turn, addressed to the steering session, and end the turn;
+> it reads your turns regularly. The user's answers come back from the
+> steering session with the user's words quoted. An answer the steering
+> session gives on its own is marked as its own and is not the user's
+> approval. Your reports go to the steering session as well.
 
 On your side:
 
@@ -92,10 +104,12 @@ On your side:
   session named, its recommendation and yours. Follow "Decisions and design".
 - Send the answer back to the session that asked, quoted with the question
   it answered.
-- If you can answer from the brief, memory or the code, answer yourself and
-  say so; the user does not need to see a question you can settle.
+- A missing fact that the brief, memory or the code settles, you answer
+  yourself, marked as your answer and not the user's. A decision, an
+  approval, and anything under "What the user decides" always goes to the
+  user, however clear the answer looks to you.
 - A session that asked the user directly, or sits in a question dialog, has
-  broken the brief. Tell it to withdraw the question and send it to you.
+  broken the rule. Tell it to withdraw the question and send it to you.
 
 ## Briefing a session
 
@@ -134,7 +148,8 @@ main, naming the commit that must be included.
 1. **Draft.** The author opens it as a draft and runs its own checks.
 2. **Independent review.** This applies to every code PR, not only the risky
    ones. Use a dedicated session that did not write the code, on a fresh
-   context, at normal effort, read-only: no edits, no pushes, no PR comments. Brief it with
+   context, at default effort, read-only: no edits, no pushes, no PR
+   comments. Brief it with
    the specification, what the PR was asked to do, the areas to look at
    hardest, and the words "the author's claims are unverified". When disk is
    short, it can share the main checkout if told not to build, switch branches
@@ -235,13 +250,19 @@ the base's commits are not ancestors of main any more. Land it like this:
 ## Waiting and wake-ups
 
 - **Check in on running sessions about every 15 minutes.** While at least
-  one session you started is working, schedule one wake-up 15 minutes out.
-  When it fires, read each running session's latest events and note for each:
-  still working, finished, stopped mid-turn, or waiting on a question it
-  failed to send you. Act on what you find (answer, route, nudge), then
-  schedule the next wake-up. Tell the user only what changed; a check-in with
-  no change gets one line at most. Stop the check-ins when no session is
-  running, and say so.
+  one session you steer is working, schedule one wake-up 15 minutes out. That
+  covers sessions you started and sessions you took over. When it fires,
+  read each running session's latest events and note for each: still
+  working, finished, stopped mid-turn, or waiting on a question it failed to
+  send you. Act on what you find (answer, route, nudge), then schedule the
+  next wake-up. Tell the user only what changed; a check-in with no change
+  gets one line at most. Stop the check-ins when no session is running, and
+  say so.
+- **A stop caused by the usage limit is reported, not nudged.** Handle it as
+  "Resources" says: after the reset, and on the user's word.
+- **If you have no tool that schedules a wake-up**, tell the user that
+  check-ins happen only when something else wakes you. Do not put a sleep
+  command in its place.
 - **Do not poll beyond that.** Sleep loops, timers shorter than the check-in
   and `gh` checks every few minutes cost usage, which is a real limit, and
   repeat what the app's PR monitor already does.
@@ -254,9 +275,9 @@ the base's commits are not ancestors of main any more. Land it like this:
   and is not polling. Offer it to the user rather than starting it unasked.
 - **When nothing will wake you** and no check-in is scheduled: say which
   step is waiting on what. Check it once each time anything else wakes you,
-  and tell the user they can ask
-  for a check at any time. Do not end a turn implying that something will
-  happen by itself when nothing will make it happen.
+  and tell the user they can ask for a check at any time. Do not end a turn
+  implying that something will happen by itself when nothing will make it
+  happen.
 
 ## Resources
 
