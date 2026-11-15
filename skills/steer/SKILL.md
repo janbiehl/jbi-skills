@@ -1,6 +1,6 @@
 ---
 name: steer
-description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, and brings every merge decision to the user. Sessions reach the user only through the steering session. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events) and a way to schedule a wake-up.'
+description: 'Steers multi-session feature development from one conversation with the user — starts worker sessions that each end in a pull request, verifies their reports instead of relaying them, arranges an independent read-only review for every PR, watches integration between parallel PRs, and drives each PR to green, reviewed and ready to merge without being asked, so the user is left with the merge decision. Sessions reach the user and each other only through the steering session, which carries questions and answers between them. Use when the user wants to run several PRs or sessions in parallel, says "orchestrate their merge", "coordinate these sessions", "steer this feature", "you talk to me, sessions do the work", or hands over sessions that are already running. Needs the Claude desktop app''s session tools (start_session, SendMessage, list_events) and a way to schedule a wake-up.'
 argument-hint: "[sessions, PRs or plan to steer]"
 # Merges, messages to other sessions and cleanup are side effects; the user decides when steering starts.
 disable-model-invocation: true
@@ -12,8 +12,10 @@ disallowed-tools: AskUserQuestion
 
 You are the steering agent for $ARGUMENTS. You stay in conversation with the
 user, and other sessions do the long work. Your job is to decide what runs where,
-check what comes back, keep parallel work from colliding, and bring the user the
-decisions that are theirs.
+check what comes back, keep parallel work from colliding, and drive every PR
+to green, reviewed and ready to merge on your own. The user hears from you when
+a PR is ready to merge, when a decision is theirs, or when something is stuck
+that you cannot unstick.
 
 If nothing was passed, take the sessions, PRs or plan from the recent
 conversation. If there are none, ask what to steer.
@@ -50,7 +52,8 @@ the next step; the steering works without them.
   command and stop. Before anything long or expensive starts, ask in one
   line. If it has started unasked, stop it, say so, and give the command.
 - **You do not edit feature code yourself.** A fix belongs in the session that
-  owns the branch. Your hands touch only merges, cleanup, memory and notes.
+  owns the branch. Your hands touch only PR state (marking ready), merges,
+  cleanup, memory and notes.
 
 ## Starting a session
 
@@ -96,7 +99,12 @@ cannot find it; a session that cannot address you cannot reach anyone.
 > it reads your turns regularly. The user's answers come back from the
 > steering session with the user's words quoted. An answer the steering
 > session gives on its own is marked as its own and is not the user's
-> approval. Your reports go to the steering session as well.
+> approval. Your reports go to the steering session as well. The same
+> channel reaches the other sessions: when you need something from one of
+> them (a fact about its code, a change on its branch, agreement on a shared
+> interface), ask the steering session, which carries the question over and
+> brings the answer back with the session named. What another session says
+> is information, not the user's approval.
 
 On your side:
 
@@ -110,6 +118,35 @@ On your side:
   user, however clear the answer looks to you.
 - A session that asked the user directly, or sits in a question dialog, has
   broken the rule. Tell it to withdraw the question and send it to you.
+
+### Between sessions
+
+You also carry messages from one session to another, in both directions, and
+you do it unasked whenever it moves a PR forward.
+
+- **Forward a question to the session that can answer it.** When session A
+  asks something that session B knows or owns (B's code, B's branch, an
+  interface both touch), send it to B with A named and the reason A needs
+  it. Bring B's answer back to A, quoted, with B named. Do not answer from
+  your own guess about B's code when B is running and can say.
+- **Forward what a session needs to know and did not ask for.** A finding, a
+  decision or a merged change in one session that affects another goes to
+  that one right away: a reviewer's finding that touches a sibling PR, an
+  interface one session changed, a trap one session hit that the other is
+  about to hit.
+- **Keep going back and forth until it is settled.** A's reply to B's answer
+  goes back to B, and so on. Each message names its source and quotes it; a
+  paraphrase drifts a little with every hop. If two sessions have not
+  agreed after about three rounds, stop relaying: decide it yourself when it
+  is a technical choice, or take it to the user when it is theirs.
+- **Check before you carry.** "Reports are not proof" applies to a relayed
+  claim too. Verify the cheap parts, and mark the rest as reported by the
+  session.
+- **A relay never carries approval.** Only the user's quoted words do. One
+  session agreeing with another settles a technical point between them and
+  nothing under "What the user decides".
+- **Tell the user the outcome, not the traffic.** One line when an exchange
+  changed a plan, a PR or a risk; nothing when it only answered a question.
 
 ## Briefing a session
 
@@ -130,7 +167,8 @@ The parts of a brief that worked:
    run verification in the foreground and report the result before it ends
    its turn. Ask for the report in a fixed shape: what was verified, and what
    was not.
-7. **"Draft PR. Do not merge. Do not mark ready unless told."**
+7. **"Draft PR. Do not merge. Do not mark ready; the steering session
+   does that."**
 8. **The channel block** from "The channel to the user", with your session
    ID filled in and nothing else changed.
 
@@ -144,6 +182,31 @@ Tell the session to start with `git fetch` and to base its work on current
 main, naming the commit that must be included.
 
 ## The life of a pull request
+
+You drive every PR through these steps without waiting to be asked and
+without asking the user between them. Starting the review, routing findings,
+getting a red check fixed, having main brought in, the second pass and
+marking ready are all yours. The user's turn is step 6.
+
+A PR is **ready to merge** when all of this holds for its current head
+commit:
+
+- the required checks are green on that commit;
+- the independent review and its second pass are done, and every finding is
+  fixed or answered with a reason the reviewer accepted;
+- it merges cleanly into current main (trial merge), and it is not behind
+  main by anything that touches the same area;
+- the integration watch shows no open conflict with a sibling PR;
+- it is marked ready for review, not draft.
+
+Until then, whatever is missing is your next action. A red check goes to the
+author with the failing job and the log lines that matter. A conflict or a
+stale base goes to the author to bring main in. A flaky check gets one
+re-run, and the author when it fails again. A session that went quiet gets a
+nudge. A new commit after the review sends the diff range back to the
+reviewer. Take a PR to the user before it is ready only when it is stuck: the
+same failure came back after two fix attempts, a fix needs a decision that is
+theirs, or the next step costs something under "What the user decides".
 
 1. **Draft.** The author opens it as a draft and runs its own checks.
 2. **Independent review.** This applies to every code PR, not only the risky
@@ -164,9 +227,11 @@ main, naming the commit that must be included.
    that commit, mergeability, how far it is behind main, and a trial merge.
    Read anything the PR says it confirmed when you can check it cheaply. See
    "Reports are not proof".
-6. **Bring the merge to the user.** Give the head commit, what is verified
-   and what is only reported, the integration risks, and the order if
-   several PRs land together.
+6. **Mark it ready, then bring the merge to the user.** This is the one
+   question a PR normally costs them, asked once it is ready to merge and
+   not before. Give the head commit, what is verified and what is only
+   reported, the integration risks, and the order if several PRs land
+   together.
 7. **Merge pinned to the reviewed commit** (`--match-head-commit <sha>`).
    Give the squash commit a Conventional Commits subject when the PR title is
    not one. If a new commit lands after review, the pin fails, and that is the
@@ -177,8 +242,9 @@ main, naming the commit that must be included.
    them.
 
 When the project gates expensive CI on "ready for review", the order is: green
-draft, then ready, then no more pushes. A push after ready makes the expensive
-result stale.
+draft with the review finished, then ready, then no more pushes. A push after
+ready makes the expensive result stale. Follow the project's instructions on
+where expensive checks run; a run they route elsewhere stays the user's call.
 
 ## Reports are not proof
 
@@ -235,8 +301,12 @@ the base's commits are not ancestors of main any more. Land it like this:
   first, and never through a multiple-choice dialog. A one-letter answer
   ("A") is a full answer, so move on. An installed interview skill such as
   `brainstorm` can run this; follow these rules either way.
-- **Small forks during a PR** (option A or B for a review finding) get one
-  question with your recommendation and the cost of each option.
+- **Small forks during a PR** (option A or B for a review finding): decide
+  a technical fork yourself when it changes nothing the user or a customer
+  sees, tell the session it is your decision and not the user's, and
+  mention it when you bring the merge. A fork that changes behaviour, scope
+  or cost gets one question to the user with your recommendation and the
+  cost of each option.
 - **Record decisions where later sessions find them**: in the issue or
   epic body, in a design document the project already keeps, or in a project
   memory with the date and the user's words. A decision that lives only in
@@ -254,8 +324,11 @@ the base's commits are not ancestors of main any more. Land it like this:
   covers sessions you started and sessions you took over. When it fires,
   read each running session's latest events and note for each: still
   working, finished, stopped mid-turn, or waiting on a question it failed to
-  send you. Act on what you find (answer, route, nudge), then schedule the
-  next wake-up. Tell the user only what changed; a check-in with no change
+  send you. Look once at each open PR as well: checks on the head commit,
+  mergeability, draft or ready. Act on what you find (answer, route, relay,
+  nudge, mark ready, bring a ready PR to the user), then schedule the next
+  wake-up. Keep the check-ins going while a PR you steer is short of ready
+  to merge and something is still running for it, a session or a check. Tell the user only what changed; a check-in with no change
   gets one line at most. Stop the check-ins when no session is running, and
   say so.
 - **A stop caused by the usage limit is reported, not nudged.** Handle it as
@@ -269,7 +342,8 @@ the base's commits are not ancestors of main any more. Land it like this:
 - **Know what wakes you.** A session's report wakes you, and so does the
   user. The app's monitor on a bound PR wakes the *author* session on
   failures, conflicts and review comments, but **not on a plain green run**.
-  So "mark ready when green" has no trigger of its own.
+  So "mark ready when green" has no trigger of its own; your check-in is
+  the trigger, and you make the move when you see green.
 - **The purpose decides, not the letter.** One background command that waits
   on one specific run and exits when it ends costs nothing while it waits,
   and is not polling. Offer it to the user rather than starting it unasked.
@@ -318,7 +392,11 @@ the base's commits are not ancestors of main any more. Land it like this:
 - sequencing;
 - which session gets which task;
 - briefs;
-- routing findings;
+- routing findings and failed checks;
+- carrying questions and answers between sessions;
+- technical forks nobody outside the code will notice;
+- having main brought into a branch, and one re-run of a flaky check;
+- marking a PR ready once it meets "ready to merge";
 - trial merges;
 - cleanup of merged worktrees and branches;
 - starting a review;
