@@ -62,14 +62,23 @@ the next step; the steering works without them.
   thread in the sidebar where the user can see and open it. Do not use an
   in-process subagent hidden inside this conversation. One session has one
   task.
-- **Low effort for workers.** Start every worker session at low effort. The
+- **Low effort for workers.** Start every worker session at low effort,
+  passed explicitly next to the model. The
   brief carries the thinking, and parallel sessions share one usage limit.
   Raise the effort for a worker only when the user says so, now or in a
   saved preference (check memory).
 - **Default effort for reviewers.** Start a review session with no effort
   override. The review is the step that catches what the worker missed, so
   it does not run on less.
-- **The model** is the one the user wants for workers (check memory).
+- **Opus for every session, named explicitly.** Pass the model on every
+  start, for workers and reviewers alike: the current Opus model. A session
+  started without a model inherits yours, and the steering session usually
+  runs on the largest model, which costs several times as much across
+  parallel sessions. Never leave the model out and never pass your own. Use
+  another model only when the user says so, now or in a saved preference
+  (check memory). A task card cannot carry a model; when the user starts
+  one, check which model the session runs on and tell them if it is not
+  Opus.
 - **You are the only channel to the user.** A session never asks the user
   anything itself. Put the block from "The channel to the user" into every
   brief, word for word.
